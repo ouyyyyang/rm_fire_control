@@ -1,0 +1,9 @@
+/rm_fire_control:
+  ros__parameters:
+    large_armor_width: 0.23  
+    small_armor_width: 0.135
+    k: 0.038  
+    gravity: 9.79
+    pi: 3.1415926 
+    s_bias: 
+    z_bias:

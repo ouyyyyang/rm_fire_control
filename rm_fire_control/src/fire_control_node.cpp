@@ -12,7 +12,13 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
     RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
 
     //传入参数
-    target = this->declare_parameter("",)
+    large_armor_width = this->declare_parameter<float>("large_armor_width", 0.23);  
+    small_armor_width = this->declare_parameter<float>("small_armor_width", 0.135);
+    k = this->declare_parameter<float>("k", 0.038); //弹丸参数(0.038为小弹丸)
+
+    s_bias = this->declare_parameter<float>("s_bias", );  //s偏移，即枪管口与云台坐标系的xy合向量偏移
+    z_bias = this->declare_parameter<float>("z_bias", );  //z偏移，即枪管口与云台坐标系的z向量偏移
+    target = this->declare_parameter("",)  
     id_number = this->declare_parameter("",)
     yaw = this->declare_parameter("",)
     r1 = this->declare_parameter("",)

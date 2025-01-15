@@ -1,7 +1,6 @@
 
 
-#define LARGE_ARMOR_WIDTH 0.23
-#define SMALL_ARMOR_WIDTH 0.135
+
 #define YAW_MOTOR_RES_SPEED 1.6f
 
 namespace rm_auto_aim
@@ -12,8 +11,8 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
     RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
 
     //传入参数
-    large_armor_width = this->declare_parameter<float>("large_armor_width", 0.23);  
-    small_armor_width = this->declare_parameter<float>("small_armor_width", 0.135);
+    LargeArmorWidth = this->declare_parameter<float>("LargeArmorWidth", 0.23);  
+    SmallArmorWidth = this->declare_parameter<float>("SmallArmorWidth", 0.135);
     k = this->declare_parameter<float>("k", 0.038); //弹丸参数(0.038为小弹丸)
 
     s_bias = this->declare_parameter<float>("s_bias", );  //s偏移，即枪管口与云台坐标系的xy合向量偏移
@@ -118,7 +117,7 @@ void expected_preview_calc() {
         if (armor_num == 2 || id_num == 1)
           armor_w = LARGE_ARMOR_WIDTH;
         else
-          armor_w = SMALL_ARMOR_WIDTH;
+          armor_w = SmallArmorWidth;
         float ax = est_x - 0.5f * armor_w * sin(est_yaw);
         float ay = est_y + 0.5f * armor_w * cos(est_yaw);
         float bx = est_x + 0.5f * armor_w * sin(est_yaw);

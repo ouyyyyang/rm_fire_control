@@ -37,7 +37,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
     // Get current roll, yaw and pitch of gimbal
     try
     {
-
+      
     }
 
     //  predict the the position of target
@@ -67,7 +67,6 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
       if (chosen_armor_pose.position.norm() < 0.1) {
           throw std::runtime_error("No valid armor to shoot");
       }
-
       // Initialize yaw, pitch
       float yaw, pitch;
       gimbal_cmd.fire_advice = FireCtrl(cur_yaw, cur_pitch, chosen_armor_pose, id_num);
@@ -76,7 +75,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
       {
         state = TRACKING_CENTER;
       }
-      // State change 转速慢就云台跟随，算上云台转动，转速快就直接打
+      // State change 转速慢就算上云台转动，转速快就直接打
       switch (state) 
       {
         case TRACKING_ARMOR: 
@@ -117,6 +116,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
           }else
           {
             CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
+            gimbal_cmd.distance = chosen_armor_pose.position.norm();
           }
           break;
         }

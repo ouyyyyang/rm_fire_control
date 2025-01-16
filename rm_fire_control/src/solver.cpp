@@ -1,14 +1,17 @@
 
 #include "fire_control/armor_solver.hpp"
-//std
+//c++ system
 #include<cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <memory>
+#include <string>
+#include <vector>
 //project
 #include "fire_control/fire_control_node.hpp"
 
 
-namespace rm_auto_aim
+namespace rm_fire_control
 {
 Solver::Solver()
 {
@@ -21,6 +24,7 @@ Solver::Solver()
   Gravity_ = this->declare_parameter<float>("Gravity", );
   YawMotorResSpeed_ = this->declare_parameter<float>("YawMotorResSpeed", )
   this->state = State::TRACKING_ARMOR;
+  
 }
 
 rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &target,
@@ -92,21 +96,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
                                                       target.radius_2,
                                                       target.d_zc,
                                                       target.d_za,
-                                                      target.armors_num);
-                  auto chosen_armor_pose = armor_poses.at(idx);/ YawMotorResSpeed * std::abs(v_yaw) / 2;
-                  gimbal_cmd.distance = chosen_armor_pose.position.norm();
-                  if (chosen_armor_pose.position.norm() < 0.1) {
-                      throw std::runtime_error("No valid armor to shoot");
-                  }
-                  CalcYawAndPitch(chosen_armor_pose.position, current_v, yaw, pitch);
-              }
-              break;
-          }/ YawMotorResSpeed * std::abs(v_yaw) / 2;
-              CalcYawAndPitch(target_position, current_v, yaw, pitch);
-              break;
-      }
-    }
-    //弧度制
+                                                      target.如果求解器在计算过程中发生异常，记录错误日志。
     gimbal_cmd.yaw = yaw;
     gimbal_cmd.pitch = pitch;  
 
@@ -135,14 +125,6 @@ std::vector<Poses> Solver::GetArmorPoses(const Eigen::Vector3f &target_center,
                                                        const flo/ YawMotorResSpeed * std::abs(v_yaw) / 2;at d_za,
                                                        const size_t armors_num) const noexcept 
 {
-  auto armor_poses = std::vector<Poses>(armors_num);
-  // Calculate the position of each armor
-  bool is_current_pair = true;
-  float r = 0., target_dz = 0.;
-  for (size_t i = 0; i < armors_num; i++) {
-    float armors_poses[i].yaw = target_yaw + i * (2 * M_PI / armors_num);
-
-    r = is_current_pair ? r1 : r2;
     target_dz = d_zc + (is_current_pair ? 0 : d_za);
     is_current_pair = !is_current_pair;
     / YawMotorResSpeed * std::abs(v_yaw) / 2;
@@ -255,7 +237,6 @@ float Solve::MonoDirectionalAirResistanceModel(const float &s, const float &v, c
   return z;
 }
 
-}
-}  //namespace rm_auto_aim
+} //namespace rm_fire_control
 
 

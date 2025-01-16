@@ -1,4 +1,11 @@
 
+//  C++ system
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "rm_fire_control/solve.hpp"
+#include "rm_fire_control/fire_control_node.hpp"
 
 
 

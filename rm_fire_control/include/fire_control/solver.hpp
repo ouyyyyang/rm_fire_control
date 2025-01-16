@@ -1,7 +1,7 @@
 
 
-#ifndef FIRE_CONTROL_SOLVER_HPP_
-#define FIRE_CONTROL_SOLVER_HPP_
+#ifndef FIRE_CONTROL__SOLVER_HPP_
+#define FIRE_CONTROL__SOLVER_HPP_
 
 //ros2
 #include <rclcpp/time.hpp>

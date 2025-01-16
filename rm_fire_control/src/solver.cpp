@@ -22,8 +22,11 @@ Solver::Solver()
   SmallArmorHeight_ = this->declare_parameter<float>("SmallArmorHeight",);
   K_ = this->declare_parameter<float>("K", );  //弹丸参数（分小弹丸和大弹丸）
   Gravity_ = this->declare_parameter<float>("Gravity", );
-  YawMotorResSpeed_ = this->declare_parameter<float>("YawMotorResSpeed", )
-  this->state = State::TRACKING_ARMOR;
+  YawMotorResSpeed_ = this->declare_parameter<float>("YawMotorResSpeed", )  // 电机响应速度
+  
+
+
+  this->state_ = State::TRACKING_ARMOR;
   
 }
 
@@ -32,7 +35,8 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
                                             std::shared_ptr<tf2_ros::Buffer> tf2_buffer_)
 {
     // Get current roll, yaw and pitch of gimbal
-    try{
+    try
+    {
 
     }
 
@@ -72,41 +76,84 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
       {
         state = TRACKING_CENTER;
       }
-      // State change
-      switch (state) {
-          case TRACKING_ARMOR: {
-              if (std::abs(target.v_yaw) > max_tracking_v_yaw_) {
-                  overflow_count_++;
-              } else {
-                  overflow_count_ = 0;
-              }
+      // State change 转速慢就云台跟随，算上云台转动，转速快就直接打
+      switch (state) 
+      {
+        case TRACKING_ARMOR: 
+        {
+          if (std::abs(target.v_yaw) > max_tracking_v_yaw_) 
+          {
+              overflow_count_++;
+          } else 
+          {
+              overflow_count_ = 0;
+          }
 
-              if (overflow_count_ > transfer_thresh_) {
-                  state = TRACKING_CENTER;
-              }
-              
-              if (controller_delay_ != 0) {
-                  target_position.x() += controller_delay_ * target.velocit/ YawMotorResSpeed * std::abs(v_yaw) / 2;y.x;
-                  target_position.y() += controller_delay_ * target.velocity.y;
-                  target_position.z() += controller_delay_ * target.velocity.z;
-                  target_yaw += controller_delay_ * target.v_yaw;
-                  armor_poses = GetArmorPoses(target_position,
-                                                      target_yaw,
-                                                      target.radius_1,
-                                                      target.radius_2,
-                                                      target.d_zc,
-                                                      target.d_za,
-                                                      target.如果求解器在计算过程中发生异常，记录错误日志。
+          if (overflow_count_ > transfer_thresh_) 
+          {
+              state = TRACKING_CENTER;
+          }
+          if (!gimbal_cmd.fire_advice) 
+          {
+            CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
+            controller_delay = std::abs(get_delta_ang_pi(yaw,cur_yaw)) / YawMotorResSpeed;
+            target_position.x() += controller_delay * target.velocity.x;
+            target_position.y() += controller_delay * target.velocity.y;
+            target_position.z() += controller_delay * target.velocity.z;
+            target_yaw += controller_delay_ * target.v_yaw;
+            armor_poses = GetArmorPoses(target_position,
+                                        target_yaw,
+                                        target.radius_1,
+                                        target.radius_2,
+                                        target.d_zc,
+                                        target.d_za,
+                                        target.armors_num);
+            chosen_armor_pose = armor_poses.at(idx);
+            gimbal_cmd.distance = chosen_armor_pose.position.norm();
+            CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
+            if (chosen_armor_pose.position.norm() < 0.1) {
+                throw std::runtime_error("No valid armor to shoot");
+            }
+          }else
+          {
+            CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
+          }
+          break;
+        }
+        case TRACKING_CENTER: 
+        {
+          if (std::abs(target.v_yaw) < max_tracking_v_yaw_) 
+          {
+            overflow_count_++;
+          } else 
+          {
+            overflow_count_ = 0;
+          }
+
+          if (overflow_count_ > transfer_thresh_) 
+          {
+            state = TRACKING_ARMOR;
+            overflow_count_ = 0;
+          }
+          gimbal_cmd.fire_advice = 1;
+          CalcYawAndPitch(target_position, cur_v, yaw, pitch);
+          break;
+        }
+      }
+    //弧度制
     gimbal_cmd.yaw = yaw;
-    gimbal_cmd.pitch = pitch;  
+    gimbal_cmd.pitch = pitch; 
+    //  change of angle
+    gimbal_cmd.diff_yaw = get_delta_ang_pi(yaw,cur_yaw);
+    gimbal_cmd.diff_pitch = get_delta_ang_pi(pitch, cur_pitch);
 
     if (gimbal_cmd.fire_advice) {
       FYT_DEBUG("armor_solver", "You Need Fire!");
-    }/ YawMotorResSpeed * std::abs(v_yaw) / 2;
+    }
   }
   else
   {
-    gimbal_cmd.fire_advice = 0;
+    throw std::runtime_error("No valid armor to shoot");
   }
   return gimbal_cmd;
 }
@@ -118,16 +165,23 @@ float Solver::GetFlyingTime(const Eigen::Vector3f &p)const noexcept
 }
 
 std::vector<Poses> Solver::GetArmorPoses(const Eigen::Vector3f &target_center,
-                                                       const float target_yaw,
-                                                       const float r1,
-                                                       const float r2,
-                                                       const float d_zc,
-                                                       const flo/ YawMotorResSpeed * std::abs(v_yaw) / 2;at d_za,
-                                                       const size_t armors_num) const noexcept 
+                                         const float target_yaw,
+                                         const float r1,
+                                         const float r2,
+                                         const float d_zc,
+                                         const flo/ YawMotorResSpeed * std::abs(v_yaw) / 2;at d_za,
+                                         const size_t armors_num) const noexcept 
 {
+  auto armor_poses = std::vector<Poses>(armors_num);
+  // Calculate the position of each armor
+  bool is_current_pair = true;
+  float r = 0., target_dz = 0.;
+  for (size_t i = 0; i < armors_num; i++) 
+  {
+    float armors_poses[i].yaw = target_yaw + i * (2 * M_PI / armors_num);
+    r = is_current_pair ? r1 : r2;
     target_dz = d_zc + (is_current_pair ? 0 : d_za);
     is_current_pair = !is_current_pair;
-    / YawMotorResSpeed * std::abs(v_yaw) / 2;
     armor_poses[i].position[i] =
       target_center + Eigen::Vector3f(-r * cos(armors_yaw), -r * sin(armors_yaw), target_dz);
   }
@@ -150,6 +204,7 @@ int Solver::SelectBestArmor(const std::vector<Poses> &armor_poses,
       float yaw_motor_delta =
         get_delta_ang_pi(atan2(armor_poses[i].position.y(), armor_poses[i].position.x()),
                          atan2(armor_poses[i+1].position.y(), armor_poses[i+1].position.x()));
+
       float angle_of_advance =
         std::abs(yaw_motor_delta) / YawMotorResSpeed * std::abs(v_yaw) / 2;
       // Return the best armor
@@ -165,7 +220,7 @@ int Solver::SelectBestArmor(const std::vector<Poses> &armor_poses,
       return -1;
     }
   }
-}               
+}      
 
 // fire_control
 bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &est, const int &id_num)
@@ -199,7 +254,16 @@ bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &es
   float bz = est.position.z() + 0.5f * armor_h;
   float allow_fire_pitchang_min = atan2(az, distance);
   float allow_fire_pitchang_max = atan2(bz, distance);
-Large
+  return (control_yaw_angle < allow_fire_yawang_max && control_yaw_angle > allow_fire_yawang_min)&&
+         (cur_pitch < allow_fire_pitchang_max && cur_pitch > allow_fire_pitchang_min);
+}
+
+//calculate the suitable gimbal pose
+void Solve::CalcYawAndPitch(const Eigen::Vector3f &position, const float &current_v, float &yaw, float &pitch)
+{
+  yaw = atan2(position.y(), position.x());
+  pitch = -pitchTrajectoryCompensation(position.head(2).norm() - s_bias, position.z() - z_bias, current_v);
+}
 
 float Solve::PitchTrajectoryCompensation(const float &s, const float &z, const float &v)const noexcept
 {
@@ -238,5 +302,4 @@ float Solve::MonoDirectionalAirResistanceModel(const float &s, const float &v, c
 }
 
 } //namespace rm_fire_control
-
 

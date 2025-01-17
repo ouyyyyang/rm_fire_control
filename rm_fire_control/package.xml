@@ -3,16 +3,30 @@
 <package format="3">
   <name>fire_control</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>RoboMaster fire control.</description>
   <maintainer email="20234001019@m.scnu.edu.cn">oy</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
+  <url type="website">https://github.com/ouyyyyang/rm_fire_control</url>
+  <url type="bugtracker">https://github.com/ouyyyyang/rm_fire_control/issues</url>
+  <author email="20234001019@m.scnu.edu.cn">Ouyang Zhuohan</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>rclcpp</depend>  
+  <depend>message_filters</depend>  
+  <depend>std_srvs</depend>  
+  <depend>std_msgs</depend>
+  <depend>auto_aim_interfaces</depend>  
+  <depend>fire_control_interfaces</depend>
+  <depend>eigen3</depend>
+
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_clang_format</test_depend>
+  
 
   <export>
     <build_type>ament_cmake</build_type>

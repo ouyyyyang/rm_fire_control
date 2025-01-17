@@ -3,12 +3,26 @@
 #ifndef FIRE_CONTROL__SOLVER_HPP_
 #define FIRE_CONTROL__SOLVER_HPP_
 
+// Eigen
+#include <Eigen/Eigen>
+
 //ros2
 #include <rclcpp/time.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 // project
-#include "rm_interfaces/msg/gimbal_cmd.hpp"
-#include "rm_interfaces/msg/target.hpp"
+#include "fire_control_interfaces/msg/gimbal_cmd.hpp"
+#include "auto_aim_interfaces/msg/target.hpp"
+#include "fire_control_interfaces/msg/target.hpp"
+
+//c++ system
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
+#include <memory>
+#include <string>
+#include <vector>
+#include <cstdio>
 
 namespace rm_auto_aim
 {
@@ -28,8 +42,7 @@ private:
                                YawMotorResSpeed_             const float target_yaw,
                                             const float r1,
                                             const float r2,
-                                            const float d_zc,
-                                            const float d_za,
+                                            const float dz,
                                             const size_t armors_num) const noexcept;
 
   int Solver::SelectBestArmor(const std::vector<Poses> &armor_poses,

@@ -1,14 +1,17 @@
+ 
 
-#include "fire_control/armor_solver.hpp"
 //c++ system
-#include<cmath>
+#include <cmath>
 #include <cstddef>
 #include <stdexcept>
 #include <memory>
 #include <string>
 #include <vector>
+#include <Eigen/Dense> 
+#include <cstdio>
 //project
 #include "fire_control/fire_control_node.hpp"
+#include "fire_control/armor_solver.hpp"
 
 
 namespace rm_fire_control
@@ -31,8 +34,7 @@ Solver::Solver()
 }
 
 rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &target,
-                                            const rclcpp::Time &current_time,
-                                            std::shared_ptr<tf2_ros::Buffer> tf2_buffer_)
+                                            const rclcpp::Time &current_time)
 {
     // Get current roll, yaw and pitch of gimbal
     try
@@ -57,7 +59,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
 
     // Choose the best armor to shoot
     std::vector<Poses> armor_poses = GetArmorPoses(
-        target_position, target_yaw, target.radius_1, target.radius_2, target.d_zc, target.d_za, target.armors_num);
+        target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
     
     int idx =
         SelectBestArmor(armor_poses, target_position, target_yaw, target.v_yaw, target.armors_num);
@@ -95,7 +97,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
           if (!gimbal_cmd.fire_advice) 
           {
             CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
-            controller_delay = std::abs(get_delta_ang_pi(yaw,cur_yaw)) / YawMotorResSpeed;
+            controller_delay = std::abs(yaw - cur_yaw) / YawMotorResSpeed;
             target_position.x() += controller_delay * target.velocity.x;
             target_position.y() += controller_delay * target.velocity.y;
             target_position.z() += controller_delay * target.velocity.z;
@@ -104,8 +106,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
                                         target_yaw,
                                         target.radius_1,
                                         target.radius_2,
-                                        target.d_zc,
-                                        target.d_za,
+                                        target.dz,
                                         target.armors_num);
             chosen_armor_pose = armor_poses.at(idx);
             gimbal_cmd.distance = chosen_armor_pose.position.norm();
@@ -136,6 +137,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
             overflow_count_ = 0;
           }
           gimbal_cmd.fire_advice = 1;
+          gimbal_cmd.distance = target_position.norm();
           CalcYawAndPitch(target_position, cur_v, yaw, pitch);
           break;
         }
@@ -144,8 +146,8 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
     gimbal_cmd.yaw = yaw;
     gimbal_cmd.pitch = pitch; 
     //  change of angle
-    gimbal_cmd.diff_yaw = get_delta_ang_pi(yaw,cur_yaw);
-    gimbal_cmd.diff_pitch = get_delta_ang_pi(pitch, cur_pitch);
+    gimbal_cmd.diff_yaw = yaw - cur_yaw;
+    gimbal_cmd.diff_pitch = pitch - cur_pitch;
 
     if (gimbal_cmd.fire_advice) {
       FYT_DEBUG("armor_solver", "You Need Fire!");
@@ -168,8 +170,7 @@ std::vector<Poses> Solver::GetArmorPoses(const Eigen::Vector3f &target_center,
                                          const float target_yaw,
                                          const float r1,
                                          const float r2,
-                                         const float d_zc,
-                                         const flo/ YawMotorResSpeed * std::abs(v_yaw) / 2;at d_za,
+                                         const float dz,
                                          const size_t armors_num) const noexcept 
 {
   auto armor_poses = std::vector<Poses>(armors_num);
@@ -180,7 +181,7 @@ std::vector<Poses> Solver::GetArmorPoses(const Eigen::Vector3f &target_center,
   {
     float armors_poses[i].yaw = target_yaw + i * (2 * M_PI / armors_num);
     r = is_current_pair ? r1 : r2;
-    target_dz = d_zc + (is_current_pair ? 0 : d_za);
+    target_dz =  is_current_pair ? 0 : dz;
     is_current_pair = !is_current_pair;
     armor_poses[i].position[i] =
       target_center + Eigen::Vector3f(-r * cos(armors_yaw), -r * sin(armors_yaw), target_dz);
@@ -246,7 +247,7 @@ bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &es
   float allow_fire_yawang_max = angle_c - angle_b;  
   float allow_fire_yawang_min = angle_c - angle_a;
 
-  float control_yaw_angle = get_delta_ang_pi(angle c, cur_yaw);
+  float control_yaw_angle = angle_c - cur_yaw;
 
   //  allow angle of pitch
   float distance = est.position.head(2).norm();

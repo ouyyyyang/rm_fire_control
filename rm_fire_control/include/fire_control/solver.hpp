@@ -51,7 +51,7 @@ private:
                               const float v_yaw) const noexcept;
 
   bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &est, const int &id_num);
-YawMotorResSpeed_
+
   float Solve::PitchTrajectoryCompensation(const float &s, const float &z, const float &v)const noexcept;
 
   float Solve::MonoDirectionalAirResistanceModel(const float &s, const float &v, const float &angle)const noexcept;
@@ -63,7 +63,8 @@ YawMotorResSpeed_
   float K_;
   float Gravity_; 
   float YawMotorResSpeed_;
-
+  int Transfer_Thresh_
+  int overflow_count_
 };
 
 struct Poses

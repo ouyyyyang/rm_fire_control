@@ -19,28 +19,28 @@ namespace rm_fire_control
 Solver::Solver()
 {
   //input parameter
-  LargeArmorWidth_ = this->declare_parameter<float>("LargeArmorWidth", 0.23);  
-  SmallArmorWidth_ = this->declare_parameter<float>("SmallArmorWidth", 0.135);
-  LargeArmorHeight_ = this->declare_parameter<float>("LargeArmorHeight",);
-  SmallArmorHeight_ = this->declare_parameter<float>("SmallArmorHeight",);
-  K_ = this->declare_parameter<float>("K", );  //弹丸参数（分小弹丸和大弹丸）
-  Gravity_ = this->declare_parameter<float>("Gravity", );
-  YawMotorResSpeed_ = this->declare_parameter<float>("YawMotorResSpeed", )  // 电机响应速度
-  
+  LargeArmorWidth_ = this->declare_parameter<float>("large_armor_width", 0.23f);  
+  SmallArmorWidth_ = this->declare_parameter<float>("small_armor_width", 0.135f);
+  LargeArmorHeight_ = this->declare_parameter<float>("large_armor_height", 0.127f);
+  SmallArmorHeight_ = this->declare_parameter<float>("small_armor_height", 0.125f);
+  K_ = this->declare_parameter<float>("k",0.038f);  //弹丸参数（分小弹丸和大弹丸）
+  Gravity_ = this->declare_parameter<float>("gravity", 9.79f);
+  YawMotorResSpeed_ = this->declare_parameter<float>("yaw_motor_res_speed", 1.6f);  // 电机响应速度
+  Transfer_Thresh_ = this->declare_parameter<float>("tranfer_thresh", 5);
+  SBias_ = this->declare_parameter<float>("s_bias", 0f);
+  ZBias_ = this->declare_parameter<float>("z_bias", 0f);
 
-
+  overflow_count_ = 0;
   this->state_ = State::TRACKING_ARMOR;
   
 }
 
 rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &target,
                                             const rclcpp::Time &current_time)
-{
+{   
     // Get current roll, yaw and pitch of gimbal
-    try
-    {
-      
-    }
+    cur_yaw = this->get_parameter("current_yaw").as_float();
+    cur_pitch = this->get_parameter("current_pitch").as_float();
 
     //  predict the the position of target
     Eigen::Vector3f target_position(target.position.x, target.position.y, target.position.z);
@@ -90,18 +90,18 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
               overflow_count_ = 0;
           }
 
-          if (overflow_count_ > transfer_thresh_) 
+          if (overflow_count_ > Transfer_Thresh_) 
           {
               state = TRACKING_CENTER;
           }
           if (!gimbal_cmd.fire_advice) 
           {
             CalcYawAndPitch(chosen_armor_pose.position, cur_v, yaw, pitch);
-            controller_delay = std::abs(yaw - cur_yaw) / YawMotorResSpeed;
+            float controller_delay = std::abs(yaw - cur_yaw) / YawMotorResSpeed;
             target_position.x() += controller_delay * target.velocity.x;
             target_position.y() += controller_delay * target.velocity.y;
             target_position.z() += controller_delay * target.velocity.z;
-            target_yaw += controller_delay_ * target.v_yaw;
+            target_yaw += controller_delay * target.v_yaw;
             armor_poses = GetArmorPoses(target_position,
                                         target_yaw,
                                         target.radius_1,
@@ -131,7 +131,7 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
             overflow_count_ = 0;
           }
 
-          if (overflow_count_ > transfer_thresh_) 
+          if (overflow_count_ > Transfer_Thresh_) 
           {
             state = TRACKING_ARMOR;
             overflow_count_ = 0;
@@ -160,9 +160,11 @@ rm_interfaces::msg::GimbalCmd Solver::Solve(const rm_auto_aim::msg::Target &targ
   return gimbal_cmd;
 }
 
-float Solver::GetFlyingTime(const Eigen::Vector3f &p)const noexcept
+float Solver::GetFlyingTime(const Eigen::Vector3f &p)
 {
-  float distance = p.head(2).norm() + s_bias;/ YawMotorResSpeed * std::abs(v_yaw) / 2;
+  float distance = p.head(2).norm() + SBias;
+  float angle = std::atan2(z, distance);
+  float t = (float)((std::exp(k * s) - 1) / (k * v * std::cos(angle)))
   return t;
 }
 
@@ -183,7 +185,7 @@ std::vector<Poses> Solver::GetArmorPoses(const Eigen::Vector3f &target_center,
     r = is_current_pair ? r1 : r2;
     target_dz =  is_current_pair ? 0 : dz;
     is_current_pair = !is_current_pair;
-    armor_poses[i].position[i] =
+    armor_poses[i].position =
       target_center + Eigen::Vector3f(-r * cos(armors_yaw), -r * sin(armors_yaw), target_dz);
   }
   return armor_poses;
@@ -197,7 +199,7 @@ int Solver::SelectBestArmor(const std::vector<Poses> &armor_poses,
   // Angle between the car's center and the X-axis
   float center_theta = atan2(target_center.y(), target_center.x());
   // Angle between the front of observed armor and the X-axis
-  for(size_t i = 0; i < armors_num;i++){
+  for(size_t i = 0; i < armors_num - 1;i++){
     float yaw_diff = get_delta_ang_pi(armor_poses[i].yaw, center_theta);
     if(std::abs(yaw_diff) < (2 * M_PI / armor) / 2)
     {
@@ -243,7 +245,7 @@ bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &es
   float by = est.position.y() - 0.5f * armor_w * cos(est.yaw);
   float angle_a = atan2(ay, ax);
   float angle_b = atan2(by, bx);
-  float angle_c = atan2(est.pition.y(), est.pision.x());
+  float angle_c = atan2(est.position.y(), est.position.x());
   float allow_fire_yawang_max = angle_c - angle_b;  
   float allow_fire_yawang_min = angle_c - angle_a;
 
@@ -263,7 +265,7 @@ bool Solevr::FireCtrl(const float cur_yaw, const float cur_pitch, const Pose &es
 void Solve::CalcYawAndPitch(const Eigen::Vector3f &position, const float &current_v, float &yaw, float &pitch)
 {
   yaw = atan2(position.y(), position.x());
-  pitch = -pitchTrajectoryCompensation(position.head(2).norm() - s_bias, position.z() - z_bias, current_v);
+  pitch = -pitchTrajectoryCompensation(position.head(2).norm() - SBias, position.z() - ZBias, current_v);
 }
 
 float Solve::PitchTrajectoryCompensation(const float &s, const float &z, const float &v)const noexcept

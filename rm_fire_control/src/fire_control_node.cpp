@@ -12,9 +12,11 @@
 namespace rm_fire_control
 {
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
-:Node("fire_control",options), solver_(nullptr)
+:Node("fire_control",options)
 {
     RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
+
+    solver_ = std::make_unique<Solver>();
 
     aim_sub_.subscribe(this, "/tracker/target", rclcpp::SensorDataQoS().get_rmw_qos_profile());
 

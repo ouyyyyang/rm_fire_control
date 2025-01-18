@@ -17,19 +17,19 @@
 #include <vector>
 
 #include "fire_control/solver.hpp"
-#include "auto_aim_interfaces/msg/tatget.hpp"
-#include "fire_control_interfaces/msg/time_info.hpp"
+#include "auto_aim_interfaces/msg/target.hpp"
+
 
 namespace rm_fire_control
 {
-class FirecontrolNode : public rclcpp::Node
+class FireControlNode : public rclcpp::Node
 {
 public:
-  explicit FirecontrolNode(const rclcpp::NodeOptions &options);
+  explicit FireControlNode(const rclcpp::NodeOptions &options);
   
 private:
   //  Publisher
-  rclcpp::Publisher<fire_control_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub;
+  rclcpp::Publisher<fire_control_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub_;
   void timerCallback();
 
   std::unique_ptr<Solver> solver_;

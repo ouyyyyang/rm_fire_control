@@ -4,15 +4,14 @@
 #include <string>
 #include <vector>
 
-#include "rm_fire_control/solve.hpp"
-#include "rm_fire_control/fire_control_node.hpp"
+#include "fire_control/fire_control_node.hpp"
 
 
 
 namespace rm_fire_control
 {
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
-:Node("fire_control",options)
+:Node("fire_control",options), solver_(nullptr)
 {
     RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
 
@@ -20,7 +19,7 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
 
     aim_sub_.subscribe(this, "/tracker/target", rclcpp::SensorDataQoS().get_rmw_qos_profile());
 
-    gimbal_pub_ = this->create_publisher<rm_interfaces::msg::GimbalCmd>("fire_control/cmd_gimbal",
+    gimbal_pub_ = this->create_publisher<fire_control_interfaces::msg::GimbalCmd>("fire_control/cmd_gimbal",
                                                                       rclcpp::SensorDataQoS());
     pub_timer_ = this->create_wall_timer(std::chrono::milliseconds(4),
                                          std::bind(&FireControlNode::timerCallback, this));
@@ -31,7 +30,7 @@ void FireControlNode::timerCallback() {
 
 
   // Init message
-  rm_interfaces::msg::GimbalCmd control_msg;
+  fire_control_interfaces::msg::GimbalCmd control_msg;
 
   // If target never detected
   if (aim_sub_.header.frame_id.empty()) {

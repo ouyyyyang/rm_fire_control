@@ -28,13 +28,13 @@ namespace rm_fire_control
 class FireControlNode : public rclcpp::Node
 {
 public:
-  explicit FireControlNode(const rclcpp::NodeOptions &options);
+  FireControlNode(const rclcpp::NodeOptions &options);
   
 private:
 
-  void TargetCallback(const auto_aim_interfaces::msg::Target::SharedPtr msg);
+  void TargetCallback(const std::shared_ptr<const auto_aim_interfaces::msg::Target> msg);
 
-  void timerCallback();
+  void TimerCallback();
 
   std::unique_ptr<Solver> solver_;
 
@@ -48,7 +48,7 @@ private:
 
   bool debug_mode_;
 
-}
+};
 
   
 }  //namespace rm_fire_control

@@ -12,8 +12,6 @@ add_definitions(-Wall -Werror)
 ## Export compile commands for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-
-
 #######################
 ## Find dependencies ##
 #######################

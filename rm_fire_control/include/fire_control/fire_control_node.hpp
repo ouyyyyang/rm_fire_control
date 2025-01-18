@@ -15,9 +15,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <optional> 
 
 #include "fire_control/solver.hpp"
 #include "auto_aim_interfaces/msg/target.hpp"
+#include "fire_control_interfaces/msg/gimbal_cmd.hpp"
 
 
 namespace rm_fire_control
@@ -28,13 +31,22 @@ public:
   explicit FireControlNode(const rclcpp::NodeOptions &options);
   
 private:
-  //  Publisher
-  rclcpp::Publisher<fire_control_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub_;
+
+  void TargetCallback(const auto_aim_interfaces::msg::Target::SharedPtr msg);
+
   void timerCallback();
 
   std::unique_ptr<Solver> solver_;
 
   message_filters::Subscriber<auto_aim_interfaces::msg::Target> aim_sub_;
+
+  std::optional<auto_aim_interfaces::msg::Target> latest_target_msg_; 
+
+  rclcpp::Publisher<fire_control_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub_;
+
+  rclcpp::TimerBase::SharedPtr pub_timer_;
+
+  bool debug_mode_;
 
 }
 

@@ -19,7 +19,9 @@
   <depend>std_msgs</depend>
   <depend>auto_aim_interfaces</depend>  
   <depend>fire_control_interfaces</depend>
-  <depend>eigen3</depend>
+  <depend>geometry_msgs</depend>  
+  <depend>sensor_msgs</depend> 
+  <depend>eigen</depend>
 
 
   <test_depend>ament_lint_auto</test_depend>

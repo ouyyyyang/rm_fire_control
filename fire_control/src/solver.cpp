@@ -154,7 +154,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     gimbal_cmd.pitch = pitch; 
     //  change of angle
     gimbal_cmd.yaw_diff = yaw - cur_yaw_;
-    gimbal_cmd.yaw_diff = pitch - cur_pitch_;
+    gimbal_cmd.pitch_diff = pitch - cur_pitch_;
 
     if (gimbal_cmd.fire_advice) {
       RCLCPP_INFO(node_->get_logger(), "You Need Fire!");

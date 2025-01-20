@@ -30,7 +30,7 @@ Solver::Solver(rclcpp::Node::SharedPtr node)
   SBias_ = node_->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
   ZBias_ = node_->declare_parameter<double>("z_bias", 0.0);
   max_tracking_v_yaw_ = node_->declare_parameter<double>("max_tracking_v_yaw", 6.0);  
-  Cur_V_ = node_->declare_parameter<double>("current_v_", 22.0);  //  m/s
+  Cur_V_ = node_->declare_parameter<double>("current_v", 22.0);  //  m/s
 
   overflow_count_ = 0;
   state_ = State::TRACKING_ARMOR;

@@ -19,18 +19,18 @@ Solver::Solver(rclcpp::Node::SharedPtr node)
 : node_(node)
 {
   //input parameter
-  LargeArmorWidth_ = node_->declare_parameter<double>("large_armor_width", 0.23f);  
-  SmallArmorWidth_ = node_->declare_parameter<double>("small_armor_width", 0.135f);
-  LargeArmorHeight_ = node_->declare_parameter<double>("large_armor_height", 0.127f);
-  SmallArmorHeight_ = node_->declare_parameter<double>("small_armor_height", 0.125f);
-  K_ = node_->declare_parameter<double>("k",0.038f);  //弹丸参数（分小弹丸和大弹丸）
-  Gravity_ = node_->declare_parameter<double>("gravity", 9.79f);
-  YawMotorResSpeed_ = node_->declare_parameter<double>("yaw_motor_res_speed", 1.6f);  // 电机响应速度
+  LargeArmorWidth_ = node_->declare_parameter<double>("large_armor_width", 0.23);  
+  SmallArmorWidth_ = node_->declare_parameter<double>("small_armor_width", 0.135);
+  LargeArmorHeight_ = node_->declare_parameter<double>("large_armor_height", 0.127);
+  SmallArmorHeight_ = node_->declare_parameter<double>("small_armor_height", 0.125);
+  K_ = node_->declare_parameter<double>("k",0.038);  //弹丸参数（分小弹丸和大弹丸）
+  Gravity_ = node_->declare_parameter<double>("gravity", 9.79);
+  YawMotorResSpeed_ = node_->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
   Transfer_Thresh_ = node_->declare_parameter<double>("tranfer_thresh", 5);
-  SBias_ = node_->declare_parameter<double>("s_bias", 0.0f);  //记得转换为秒为单位
-  ZBias_ = node_->declare_parameter<double>("z_bias", 0.0f);
+  SBias_ = node_->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
+  ZBias_ = node_->declare_parameter<double>("z_bias", 0.0);
   max_tracking_v_yaw_ = node_->declare_parameter<double>("max_tracking_v_yaw", 6.0);  
-
+  Cur_V_ = node_->declare_parameter<double>("current_v_", 22.0);  //  m/s
 
   overflow_count_ = 0;
   state_ = State::TRACKING_ARMOR;
@@ -38,19 +38,30 @@ Solver::Solver(rclcpp::Node::SharedPtr node)
 }
 
 fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces::msg::Target &target,
-                                                      const rclcpp::Time &current_time)
+                                                      const rclcpp::Time &current_time,
+                                                      std::shared_ptr<tf2_ros::Buffer> tf2_buffer)
 {   
-  // Get current yaw and pitch of gimbal and current v
-  cur_yaw_ = node_->get_parameter("current_yaw").as_double();
-  cur_pitch_ = node_->get_parameter("current_pitch").as_double();
-  cur_v_ = node_->get_parameter("current_v").as_double();
+  // Get current yaw and pitch of gimbal
+  try {
+    auto gimbal_tf =
+      tf2_buffer->lookupTransform(target.header.frame_id, "gimbal_link", tf2::TimePointZero);
+    auto msg_q = gimbal_tf.transform.rotation;
 
-  max_tracking_v_yaw_ = node_->get_parameter("max_tracking_v_yaw").as_double();
+    tf2::Quaternion tf_q;
+    tf2::fromMsg(msg_q, tf_q);
+    double roll;
+    tf2::Matrix3x3(tf_q).getRPY(roll, cur_pitch_, cur_yaw_);
+    cur_pitch_ = -cur_pitch_;
+  } catch (tf2::TransformException &ex) {
+    RCLCPP_ERROR(node_->get_logger(), "armor_solver: %s", ex.what());
+    throw ex;
+  }
+
 
   //  predict the the position of target
   Eigen::Vector3d target_position(target.position.x, target.position.y, target.position.z);
   double target_yaw = target.yaw;
-  double flying_time = GetFlyingTime(target_position, cur_v_);
+  double flying_time = GetFlyingTime(target_position);
   double dt =
       (current_time - rclcpp::Time(target.header.stamp)).seconds() + flying_time;  
   target_position.x() += dt * target.velocity.x;
@@ -101,7 +112,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
         }
         if (!gimbal_cmd.fire_advice) 
         {
-          CalcYawAndPitch(chosen_armor_pose.position, cur_v_, yaw, pitch);
+          CalcYawAndPitch(chosen_armor_pose.position, yaw, pitch);
           double controller_delay = std::abs(yaw - cur_yaw_) / YawMotorResSpeed_;
           target_position.x() += controller_delay * target.velocity.x;
           target_position.y() += controller_delay * target.velocity.y;
@@ -115,7 +126,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
                                       target.armors_num);
           chosen_armor_pose = armor_poses.at(idx);
           gimbal_cmd.distance = chosen_armor_pose.position.norm();
-          CalcYawAndPitch(chosen_armor_pose.position, cur_v_, yaw, pitch);
+          CalcYawAndPitch(chosen_armor_pose.position, yaw, pitch);
           if (chosen_armor_pose.position.norm() < 0.1) 
           {  
             RCLCPP_ERROR(node_->get_logger(), "No valid armor to shoot");   
@@ -123,7 +134,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
           } 
         }else
         {
-          CalcYawAndPitch(chosen_armor_pose.position, cur_v_, yaw, pitch);
+          CalcYawAndPitch(chosen_armor_pose.position, yaw, pitch);
           gimbal_cmd.distance = chosen_armor_pose.position.norm();
         }
         break;
@@ -145,7 +156,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
         }
         gimbal_cmd.fire_advice = 1;
         gimbal_cmd.distance = target_position.norm();
-        CalcYawAndPitch(target_position, cur_v_, yaw, pitch);
+        CalcYawAndPitch(target_position, yaw, pitch);
         break;
       }
     }
@@ -154,7 +165,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     gimbal_cmd.pitch = pitch; 
     //  change of angle
     gimbal_cmd.yaw_diff = yaw - cur_yaw_;
-    gimbal_cmd.pitch_diff = pitch - cur_pitch_;
+    gimbal_cmd.pitch_diff = - (pitch - cur_pitch_);
 
     if (gimbal_cmd.fire_advice) {
       RCLCPP_INFO(node_->get_logger(), "You Need Fire!");
@@ -168,11 +179,11 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   return gimbal_cmd;
 }
 
-double Solver::GetFlyingTime(const Eigen::Vector3d &p, const double &cur_v)const noexcept
+double Solver::GetFlyingTime(const Eigen::Vector3d &p)const noexcept
 {
   double distance = p.head(2).norm() + SBias_;
   double angle = std::atan2(p.z(), distance);
-  double t = (double)((std::exp(K_ * distance) - 1) / (K_ * cur_v * std::cos(angle)));
+  double t = (double)((std::exp(K_ * distance) - 1) / (K_ * Cur_V_ * std::cos(angle)));
   return t;
 }
 
@@ -280,10 +291,10 @@ bool Solver::FireCtrl(const double cur_yaw, const double cur_pitch, const Pose &
 }
 
 //calculate the suitable gimbal pose
-void Solver::CalcYawAndPitch(const Eigen::Vector3d &position, const double &cur_v, double &yaw, double &pitch)
+void Solver::CalcYawAndPitch(const Eigen::Vector3d &position, double &yaw, double &pitch)
 {
   yaw = atan2(position.y(), position.x());
-  pitch = -PitchTrajectoryCompensation(position.head(2).norm() - SBias_, position.z() - ZBias_, cur_v);
+  pitch = PitchTrajectoryCompensation(position.head(2).norm() - SBias_, position.z() - ZBias_, Cur_V_);
 }
 
 double Solver::PitchTrajectoryCompensation(const double &s, const double &z, const double &v)const noexcept

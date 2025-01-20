@@ -5,7 +5,10 @@
 #include <vector>
 #include <optional> 
 
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/convert.h>
 #include "fire_control/fire_control_node.hpp"
+
 
 namespace rm_fire_control
 {
@@ -13,6 +16,14 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
 :Node("fire_control",options), solver_(std::make_unique<Solver>(shared_from_this()))
 {
   RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
+  
+  // tf2 relevant
+  tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+  // Create the timer interface before call to waitForTransform,
+  // to avoid a tf2_ros::CreateTimerInterfaceException exception
+  auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+    this->get_node_base_interface(), this->get_node_timers_interface());
+  tf2_buffer_->setCreateTimerInterface(timer_interface);
   
   //  target subscribe
   aim_sub_.subscribe(this, "/tracker/target", rclcpp::SensorDataQoS().get_rmw_qos_profile());
@@ -60,7 +71,7 @@ void FireControlNode::TimerCallback()
  
   if (target_msg.tracking) {  
     try {  
-      control_msg = solver_->Solve(target_msg, this->now());  
+      control_msg = solver_->Solve(target_msg, this->now(), tf2_buffer_);  
     } catch (const std::runtime_error &e) {  
       RCLCPP_ERROR(this->get_logger(), "Runtime error in solver: %s", e.what());  
       control_msg.yaw_diff = 0;  

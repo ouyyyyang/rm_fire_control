@@ -9,6 +9,8 @@
 //ros2
 #include <rclcpp/time.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/buffer.h>
 
 // project
 #include "fire_control_interfaces/msg/gimbal_cmd.hpp"
@@ -38,11 +40,12 @@ public:
   Solver(rclcpp::Node::SharedPtr node); 
 
   fire_control_interfaces::msg::GimbalCmd Solve(const auto_aim_interfaces::msg::Target &target_msg,
-                                      const rclcpp::Time &current_time);
+                                      const rclcpp::Time &current_time,
+                                      std::shared_ptr<tf2_ros::Buffer> tf2_buffer);
 
   enum State { TRACKING_ARMOR = 0, TRACKING_CENTER = 1 } state_;
 private:
-  double GetFlyingTime(const Eigen::Vector3d &p, const double &cur_v)const noexcept;
+  double GetFlyingTime(const Eigen::Vector3d &p)const noexcept;
 
   std::vector<Pose> GetArmorPoses(const Eigen::Vector3d &target_center,
                                   const double target_yaw,
@@ -59,7 +62,7 @@ private:
 
   bool FireCtrl(const double cur_yaw, const double cur_pitch, const Pose &est, const char &id_num);
 
-  void CalcYawAndPitch(const Eigen::Vector3d &position, const double &cur_v, double &yaw, double &pitch);
+  void CalcYawAndPitch(const Eigen::Vector3d &position, double &yaw, double &pitch);
 
   double PitchTrajectoryCompensation(const double &s, const double &z, const double &v)const noexcept;
 
@@ -80,7 +83,7 @@ private:
   double max_tracking_v_yaw_;
   double cur_yaw_;
   double cur_pitch_;
-  double cur_v_;
+  double Cur_V_;
 
   rclcpp::Node::SharedPtr node_; 
 };

@@ -26,7 +26,7 @@ Solver::Solver(rclcpp::Node::SharedPtr node)
   K_ = node_->declare_parameter<double>("k",0.038);  //弹丸参数（分小弹丸和大弹丸）
   Gravity_ = node_->declare_parameter<double>("gravity", 9.79);
   YawMotorResSpeed_ = node_->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
-  Transfer_Thresh_ = node_->declare_parameter<double>("tranfer_thresh", 5);
+  Transfer_Thresh_ = node_->declare_parameter<int>("tranfer_thresh", 5);
   SBias_ = node_->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
   ZBias_ = node_->declare_parameter<double>("z_bias", 0.0);
   max_tracking_v_yaw_ = node_->declare_parameter<double>("max_tracking_v_yaw", 6.0);  

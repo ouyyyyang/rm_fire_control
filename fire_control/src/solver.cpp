@@ -361,38 +361,38 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
 
 } //namespace rm_fire_control
 
-// int main(int argc, char **argv)  
-// {  
-//     // 初始化 ROS 节点  
-//     rclcpp::init(argc, argv);  
-//     auto node = std::make_shared<rclcpp::Node>("test_node");  
+int main(int argc, char **argv)  
+{  
+    // 初始化 ROS 节点  
+    rclcpp::init(argc, argv);  
+    auto node = std::make_shared<rclcpp::Node>("test_node");  
 
-//     // 创建 Solver 对象  
-//     rm_fire_control::Solver solver(node);  
+    // 创建 Solver 对象  
+    rm_fire_control::Solver solver(node);  
 
-//     // 测试案例 1: 计算飞行时间  
-//     Eigen::Vector3d target_position(10.0, 0.0, 0.0);  
-//     double flying_time = solver.GetFlyingTime(target_position);  
-//     std::cout << "Flying time: " << flying_time << " seconds" << std::endl;  
+    // 测试案例 1: 计算飞行时间  
+    Eigen::Vector3d target_position(10.0, 0.0, 0.0);  
+    double flying_time = solver.GetFlyingTime(target_position);  
+    std::cout << "Flying time: " << flying_time << " seconds" << std::endl;  
 
-//     // 测试案例 2: 计算装甲板位置  
-//     Eigen::Vector3d target_center(0.5, 0.0, 0.0);  
-//     double target_yaw = 0.0;  
-//     double r1 = 0.5, r2 = 0.3, dz = 0.1;  
-//     size_t armors_num = 4;  
-//     auto armor_poses = solver.GetArmorPoses(target_center, target_yaw, r1, r2, dz, armors_num);  
-//     std::cout << "Armor poses:" << std::endl;  
-//     for (const auto &pose : armor_poses)  
-//     {  
-//         std::cout << "Position: (" << pose.position.x() << ", " << pose.position.y() << ", " << pose.position.z() << "), "  
-//                   << "Yaw: " << pose.yaw << std::endl;  
-//     }  
+    // 测试案例 2: 计算装甲板位置  
+    Eigen::Vector3d target_center(0.5, 0.0, 0.0);  
+    double target_yaw = 0.0;  
+    double r1 = 0.5, r2 = 0.3, dz = 0.1;  
+    size_t armors_num = 4;  
+    auto armor_poses = solver.GetArmorPoses(target_center, target_yaw, r1, r2, dz, armors_num);  
+    std::cout << "Armor poses:" << std::endl;  
+    for (const auto &pose : armor_poses)  
+    {  
+        std::cout << "Position: (" << pose.position.x() << ", " << pose.position.y() << ", " << pose.position.z() << "), "  
+                  << "Yaw: " << pose.yaw << std::endl;  
+    }  
 
-//     // 测试案例 3: 选择最佳装甲板  
-//     int best_armor_index = solver.SelectBestArmor(armor_poses, target_center, target_yaw, 0.0, armors_num);  
-//     std::cout << "Best armor index: " << best_armor_index << std::endl;  
+    // 测试案例 3: 选择最佳装甲板  
+    int best_armor_index = solver.SelectBestArmor(armor_poses, target_center, target_yaw, 0.0, armors_num);  
+    std::cout << "Best armor index: " << best_armor_index << std::endl;  
 
-//     // 关闭 ROS 节点  
-//     rclcpp::shutdown();  
-//     return 0;  
-// }
+    // 关闭 ROS 节点  
+    rclcpp::shutdown();  
+    return 0;  
+}

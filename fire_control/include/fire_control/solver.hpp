@@ -44,7 +44,7 @@ public:
                                       std::shared_ptr<tf2_ros::Buffer> tf2_buffer);
 
   enum State { TRACKING_ARMOR = 0, TRACKING_CENTER = 1 } state_;
-private:
+
   double GetFlyingTime(const Eigen::Vector3d &p)const noexcept;
 
   std::vector<Pose> GetArmorPoses(const Eigen::Vector3d &target_center,

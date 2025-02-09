@@ -225,39 +225,55 @@ int Solver::SelectBestArmor(const std::vector<Pose> &armor_poses,
                             const double v_yaw,
                             const int armors_num)const noexcept
 {
-  // Angle between the car's center and the X-axis
+  const double SECTOR = 2 * M_PI / armors_num;
   double center_theta = atan2(target_center.y(), target_center.x());
-  // Angle between the front of observed armor and the X-axis
-  for(int i = 0; i < armors_num - 1;i++)
+
+  // 存储候选装甲板及其优先级
+  std::vector<std::pair<int, double>> candidates;
+
+  for (int i = 0; i < armors_num; ++i) 
   {
-    double yaw_diff = armor_poses[i].yaw - center_theta;
-    int best_armor_index = -1; 
-    if(std::abs(yaw_diff) < (2 * M_PI / armors_num) / 2)
-    {
-      // Angle between this armor and next armor
-      double yaw_motor_delta = atan2(armor_poses[i].position.y(), armor_poses[i].position.x()) - 
-                              atan2(armor_poses[i+1].position.y(), armor_poses[i+1].position.x());
+    // 计算相对目标中心的角度
+    Eigen::Vector3d rel_pos = armor_poses[i].position - target_center;
+    double armor_theta = atan2(rel_pos.y(), rel_pos.x());
+    
+    // 角度差值（考虑周期）
+    double theta_diff = std::remainder(armor_theta - center_theta, 2*M_PI);
+    if (std::abs(theta_diff) > SECTOR/2) continue;
 
-      double angle_of_advance =
-        std::abs(yaw_motor_delta) / YawMotorResSpeed_ * std::abs(v_yaw) / 2;
+    // 计算相邻装甲板
+    int next = (i + 1) % armors_num;
+    Eigen::Vector3d next_rel_pos = armor_poses[next].position - target_center;
+    double next_theta = atan2(next_rel_pos.y(), next_rel_pos.x());
+    
+    // 计算相对角度差
+    double theta_delta = std::remainder(next_theta - armor_theta, 2*M_PI);
+    
+    // 计算预测量（带方向）
+    double predict_time = theta_delta / YawMotorResSpeed_;
+    double angle_advance = v_yaw * predict_time;
 
-      int sign = v_yaw > 0 ? 1 : -1;
-      // Return the best armor
-      if (sign * yaw_diff < (2 * M_PI / armors_num) / 2 - angle_of_advance ||
-            angle_of_advance > (2 * M_PI / armors_num) / 4) 
-      {
-        best_armor_index = i;
-      } else 
-      {
-        best_armor_index = i+1;
-      }
-      return best_armor_index;
-    }
-    else
+    // 计算有效覆盖范围
+    double coverage_start = theta_diff - angle_advance;
+    double coverage_end = theta_diff + (SECTOR - angle_advance);
+    
+    // 根据覆盖范围计算优先级
+    double coverage = std::min(coverage_end, SECTOR/2) 
+                    - std::max(coverage_start, -SECTOR/2);
+    if (coverage > 0) 
     {
-      return best_armor_index;
+        candidates.emplace_back(i, coverage);
     }
   }
+
+  // 选择覆盖范围最大的装甲板
+  if (!candidates.empty()) 
+  {
+    std::sort(candidates.begin(), candidates.end(),
+              [](auto& a, auto& b) { return a.second > b.second; });
+    return candidates[0].first;
+  }
+  
   return -1;
 }      
 

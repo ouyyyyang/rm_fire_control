@@ -26,9 +26,15 @@
   <depend>eigen</depend>
 
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
-  <test_depend>ament_cmake_clang_format</test_depend>
+  <test_depend>ament_lint_auto</test_depend>  
+  <test_depend>ament_lint_common</test_depend>  
+  <test_depend>ament_cmake_clang_format</test_depend>  
+  <test_depend>ament_cmake_gtest</test_depend> <!-- 添加 Google Test 依赖 -->  
+  <test_depend>rclcpp</test_depend> <!-- 确保测试时链接 rclcpp -->  
+  <test_depend>tf2_ros</test_depend> <!-- 确保测试时链接 tf2_ros -->  
+  <test_depend>auto_aim_interfaces</test_depend> <!-- 确保测试时链接 auto_aim_interfaces -->  
+  <test_depend>fire_control_interfaces</test_depend> <!-- 确保测试时链接 fire_control_interfaces -->  
+
   
 
   <export>

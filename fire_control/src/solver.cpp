@@ -23,7 +23,7 @@ Solver::Solver(rclcpp::Node::SharedPtr node)
   SmallArmorWidth_ = node_->declare_parameter<double>("small_armor_width", 0.135);
   LargeArmorHeight_ = node_->declare_parameter<double>("large_armor_height", 0.127);
   SmallArmorHeight_ = node_->declare_parameter<double>("small_armor_height", 0.125);
-  K_ = node_->declare_parameter<double>("k",0.038);  //弹丸参数（分小弹丸和大弹丸）
+  K_ = node_->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）
   Gravity_ = node_->declare_parameter<double>("gravity", 9.79);
   YawMotorResSpeed_ = node_->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
   Transfer_Thresh_ = node_->declare_parameter<int>("tranfer_thresh", 5);
@@ -200,10 +200,19 @@ std::vector<Pose> Solver::GetArmorPoses(const Eigen::Vector3d &target_center,
   double r = 0., target_dz = 0.;
   for (size_t i = 0; i < armors_num; i++) 
   {
-    armors_poses[i].yaw = target_yaw + i * (2 * M_PI / armors_num);
-    r = is_current_pair ? r1 : r2;
-    target_dz =  is_current_pair ? 0 : dz;
-    is_current_pair = !is_current_pair;
+    if(armors_num == 4)
+    {
+      armors_poses[i].yaw = target_yaw + i * (2 * M_PI / armors_num);
+      r = is_current_pair ? r1 : r2;
+      target_dz =  is_current_pair ? 0 : dz;
+      is_current_pair = !is_current_pair;
+    }
+    else
+    {
+      r = r1;
+      target_dz = 0;
+    }
+    
     armors_poses[i].position =
       target_center + Eigen::Vector3d(-r * cos(armors_poses[i].yaw), -r * sin(armors_poses[i].yaw), target_dz);
   }
@@ -336,3 +345,38 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
 
 } //namespace rm_fire_control
 
+// int main(int argc, char **argv)  
+// {  
+//     // 初始化 ROS 节点  
+//     rclcpp::init(argc, argv);  
+//     auto node = std::make_shared<rclcpp::Node>("test_node");  
+
+//     // 创建 Solver 对象  
+//     rm_fire_control::Solver solver(node);  
+
+//     // 测试案例 1: 计算飞行时间  
+//     Eigen::Vector3d target_position(10.0, 0.0, 0.0);  
+//     double flying_time = solver.GetFlyingTime(target_position);  
+//     std::cout << "Flying time: " << flying_time << " seconds" << std::endl;  
+
+//     // 测试案例 2: 计算装甲板位置  
+//     Eigen::Vector3d target_center(0.5, 0.0, 0.0);  
+//     double target_yaw = 0.0;  
+//     double r1 = 0.5, r2 = 0.3, dz = 0.1;  
+//     size_t armors_num = 4;  
+//     auto armor_poses = solver.GetArmorPoses(target_center, target_yaw, r1, r2, dz, armors_num);  
+//     std::cout << "Armor poses:" << std::endl;  
+//     for (const auto &pose : armor_poses)  
+//     {  
+//         std::cout << "Position: (" << pose.position.x() << ", " << pose.position.y() << ", " << pose.position.z() << "), "  
+//                   << "Yaw: " << pose.yaw << std::endl;  
+//     }  
+
+//     // 测试案例 3: 选择最佳装甲板  
+//     int best_armor_index = solver.SelectBestArmor(armor_poses, target_center, target_yaw, 0.0, armors_num);  
+//     std::cout << "Best armor index: " << best_armor_index << std::endl;  
+
+//     // 关闭 ROS 节点  
+//     rclcpp::shutdown();  
+//     return 0;  
+// }

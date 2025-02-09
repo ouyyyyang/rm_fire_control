@@ -32,6 +32,17 @@ rclcpp_components_register_node(${PROJECT_NAME}
   EXECUTABLE ${PROJECT_NAME}_node
 )
 
+# 测试solver
+add_executable(solver_demo src/solver.cpp) 
+
+target_link_libraries(solver_demo  
+  ${PROJECT_NAME})
+
+
+# 安装可执行文件  
+install(TARGETS solver_demo  
+  DESTINATION lib/${PROJECT_NAME}  
+)  
 #############
 ## Testing ##
 #############

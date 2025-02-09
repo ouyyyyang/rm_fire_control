@@ -13,10 +13,10 @@
 namespace rm_fire_control
 {
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
-:Node("fire_control",options), solver_(std::make_unique<Solver>(shared_from_this()))
+:Node("fire_control",options)
 {
   RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
-  
+  solver_ = std::make_unique<Solver>(shared_from_this());
   // tf2 relevant
   tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   // Create the timer interface before call to waitForTransform,
@@ -64,62 +64,62 @@ void FireControlNode::TargetCallback(const auto_aim_interfaces::msg::Target::Sha
 void FireControlNode::TimerCallback()  
 {  
   //  init
-  fire_control_interfaces::msg::GimbalCmd control_msg;  
- 
+  fire_control_interfaces::msg::GimbalCmd control_msg; 
+  control_msg.yaw_diff = 0.0;
+  control_msg.pitch_diff = 0.0;
+  control_msg.distance = -1.0;
+  control_msg.pitch = 0.0;
+  control_msg.yaw = 0.0;
+  control_msg.fire_advice = false;
+
   if (!latest_target_msg_) 
   { 
+    gimbal_pub_->publish(control_msg);
     return;  
   }  
 
-  if (!tf2_buffer_->canTransform(  
-        "odom", "camera_optical_frame",  
-        tf2::TimePointZero)) {  
-        RCLCPP_WARN(this->get_logger(), "Required transform is not available");  
-        return;  
-    }
-
   if(latest_target_msg_->header.frame_id.empty())
   {
-    control_msg.yaw_diff = 0;  
-    control_msg.pitch_diff = 0;  
-    control_msg.distance = -1;  
-    control_msg.pitch = 0;  
-    control_msg.yaw = 0;  
-    control_msg.fire_advice = false;  
+    RCLCPP_WARN(this->get_logger(), "Empty target frame_id");
     gimbal_pub_->publish(control_msg); 
     return;
   }
 
- 
- 
+  const auto target_time = tf2_ros::fromMsg(latest_target_msg_->header.stamp);
+
+  if (!tf2_buffer_->canTransform(  
+        target_frame_,
+        latest_target_msg_->header.frame_id,  
+        target_time)) 
+  {  
+        RCLCPP_WARN(this->get_logger(), "Required transform is not available");
+        gimbal_pub_->publish(control_msg);  
+        return;  
+  }
+
   if (latest_target_msg_->tracking) {  
     try {  
       control_msg = solver_->Solve(*latest_target_msg_, this->now(), tf2_buffer_);  
     } catch (const std::runtime_error &e) {  
       RCLCPP_ERROR(this->get_logger(), "Runtime error in solver: %s", e.what());  
-      control_msg.yaw_diff = 0;  
-      control_msg.pitch_diff = 0;  
-      control_msg.distance = -1;  
-      control_msg.fire_advice = false;  
+      control_msg.yaw_diff = 0.0;
+      control_msg.pitch_diff = 0.0;
+      control_msg.distance = -1.0;
+      control_msg.pitch = 0.0;
+      control_msg.yaw = 0.0;
+      control_msg.fire_advice = false;
     } catch (const std::exception &e) {  
       RCLCPP_ERROR(this->get_logger(), "Exception in solver: %s", e.what());  
-      control_msg.yaw_diff = 0;  
-      control_msg.pitch_diff = 0;  
-      control_msg.distance = -1;  
-      control_msg.fire_advice = false;  
+      control_msg.yaw_diff = 0.0;
+      control_msg.pitch_diff = 0.0;
+      control_msg.distance = -1.0;
+      control_msg.pitch = 0.0;
+      control_msg.yaw = 0.0;
+      control_msg.fire_advice = false;
     } catch (...) {  
       RCLCPP_ERROR(this->get_logger(), "Unknown error in solver!");  
-      control_msg.yaw_diff = 0;  
-      control_msg.pitch_diff = 0;  
-      control_msg.distance = -1;  
-      control_msg.fire_advice = false;  
     }  
-  } else {  
-    control_msg.yaw_diff = 0;  
-    control_msg.pitch_diff = 0;  
-    control_msg.distance = -1;  
-    control_msg.fire_advice = false;  
-  }  
+  }
 
   gimbal_pub_->publish(control_msg);  
    

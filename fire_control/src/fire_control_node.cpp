@@ -13,10 +13,11 @@
 namespace rm_fire_control
 {
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
-:Node("fire_control",options)
+:Node("fire_control",options), solver_(nullptr)
 {
+  RCLCPP_WARN(this->get_logger(), "FireControlNode: Warn level log");  
+  RCLCPP_ERROR(this->get_logger(), "FireControlNode: Error level log");
   RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
-  solver_ = std::make_unique<Solver>(shared_from_this());
   // tf2 relevant
   tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   // Create the timer interface before call to waitForTransform,
@@ -52,6 +53,11 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
 
 void FireControlNode::TargetCallback(const auto_aim_interfaces::msg::Target::SharedPtr msg)  
 {  
+  //init solver_
+  if (solver_ == nullptr) {
+    solver_ = std::make_unique<Solver>(weak_from_this());
+  }
+
   RCLCPP_INFO(this->get_logger(),   
     "Target received - frame_id: %s, tracking: %d, stamp: %.3f",  
     msg->header.frame_id.c_str(),  
@@ -71,6 +77,11 @@ void FireControlNode::TimerCallback()
   control_msg.pitch = 0.0;
   control_msg.yaw = 0.0;
   control_msg.fire_advice = false;
+
+  if(solver_ == nullptr)
+  {
+    return;
+  }
 
   if (!latest_target_msg_) 
   { 

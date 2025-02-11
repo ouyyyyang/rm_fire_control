@@ -15,32 +15,38 @@
 
 namespace rm_fire_control
 {
-Solver::Solver(rclcpp::Node::SharedPtr node)  
-: node_(node)
+Solver::Solver(std::weak_ptr<rclcpp::Node> n)  
+: node_(n)
 {
+  auto node = node_.lock();
+
   //input parameter
-  LargeArmorWidth_ = node_->declare_parameter<double>("large_armor_width", 0.23);  
-  SmallArmorWidth_ = node_->declare_parameter<double>("small_armor_width", 0.135);
-  LargeArmorHeight_ = node_->declare_parameter<double>("large_armor_height", 0.127);
-  SmallArmorHeight_ = node_->declare_parameter<double>("small_armor_height", 0.125);
-  K_ = node_->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）
-  Gravity_ = node_->declare_parameter<double>("gravity", 9.79);
-  YawMotorResSpeed_ = node_->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
-  Transfer_Thresh_ = node_->declare_parameter<int>("tranfer_thresh", 5);
-  SBias_ = node_->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
-  ZBias_ = node_->declare_parameter<double>("z_bias", 0.0);
-  max_tracking_v_yaw_ = node_->declare_parameter<double>("max_tracking_v_yaw", 6.0);  
-  Cur_V_ = node_->declare_parameter<double>("current_v", 22.0);  //  m/s
+  LargeArmorWidth_ = node->declare_parameter<double>("large_armor_width", 0.23);  
+  SmallArmorWidth_ = node->declare_parameter<double>("small_armor_width", 0.135);
+  LargeArmorHeight_ = node->declare_parameter<double>("large_armor_height", 0.127);
+  SmallArmorHeight_ = node->declare_parameter<double>("small_armor_height", 0.125);
+  K_ = node->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）
+  Gravity_ = node->declare_parameter<double>("gravity", 9.79);
+  YawMotorResSpeed_ = node->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
+  Transfer_Thresh_ = node->declare_parameter<int>("tranfer_thresh", 5);
+  SBias_ = node->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
+  ZBias_ = node->declare_parameter<double>("z_bias", 0.0);
+  max_tracking_v_yaw_ = node->declare_parameter<double>("max_tracking_v_yaw", 6.0);  
+  Cur_V_ = node->declare_parameter<double>("current_v", 22.0);  //  m/s
 
   overflow_count_ = 0;
   state_ = State::TRACKING_ARMOR;
   
+
+  node.reset();
 }
 
 fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces::msg::Target &target,
                                                       const rclcpp::Time &current_time,
                                                       std::shared_ptr<tf2_ros::Buffer> tf2_buffer)
 {   
+  node_shared_ = node_.lock();
+  
   // Get current yaw and pitch of gimbal
   try {
     auto gimbal_tf =
@@ -53,7 +59,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     tf2::Matrix3x3(tf_q).getRPY(roll, cur_pitch_, cur_yaw_);
     cur_pitch_ = -cur_pitch_;
   } catch (tf2::TransformException &ex) {
-    RCLCPP_ERROR(node_->get_logger(), "armor_solver: %s", ex.what());
+    RCLCPP_ERROR(node_shared_->get_logger(), "armor_solver: %s", ex.what());
     throw ex;
   }
 
@@ -129,7 +135,8 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
           CalcYawAndPitch(chosen_armor_pose.position, yaw, pitch);
           if (chosen_armor_pose.position.norm() < 0.1) 
           {  
-            RCLCPP_ERROR(node_->get_logger(), "No valid armor to shoot");   
+            RCLCPP_ERROR(node_shared_->get_logger(), "No valid armor to shoot");
+            node_shared_.reset();   
             return fire_control_interfaces::msg::GimbalCmd();  
           } 
         }else
@@ -168,14 +175,16 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     gimbal_cmd.pitch_diff = - (pitch - cur_pitch_);
 
     if (gimbal_cmd.fire_advice) {
-      RCLCPP_INFO(node_->get_logger(), "You Need Fire!");
+      RCLCPP_INFO(node_shared_->get_logger(), "You Need Fire!");
     }
   }
   else
   {
-    RCLCPP_ERROR(node_->get_logger(), "No valid armor to shoot");  
+    RCLCPP_ERROR(node_shared_->get_logger(), "No valid armor to shoot"); 
+    node_shared_.reset(); 
     return fire_control_interfaces::msg::GimbalCmd();
   }
+  node_shared_.reset();
   return gimbal_cmd;
 }
 
@@ -319,7 +328,7 @@ double Solver::PitchTrajectoryCompensation(const double &s, const double &z, con
     z_actual = MonoDirectionalAirResistanceModel(s, v, angle_pitch);
     dz = 0.3*(z - z_actual);
     z_temp = z_temp + dz;
-    RCLCPP_INFO(node_->get_logger(),   
+    RCLCPP_INFO(node_shared_->get_logger(),   
                 "iteration num %d: angle_pitch %f, temp target z:%f, err of z:%f, s:%f",   
                 i + 1, angle_pitch * 180 / M_PI, z_temp, dz, s);  
 
@@ -339,7 +348,7 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
   //z为给定v与angle时的高度
   z = (double)(v * std::sin(angle) * t - Gravity_ * t * t / 2);
   printf("model %f %f\n", t, z);
-  RCLCPP_INFO(node_->get_logger(), "model %f %f\n", t, z);
+  RCLCPP_INFO(node_shared_->get_logger(), "model %f %f\n", t, z);
   return z;
 }
 
@@ -379,4 +388,4 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
 //     // 关闭 ROS 节点  
 //     rclcpp::shutdown();  
 //     return 0;  
-// }
+// }node

@@ -37,7 +37,7 @@ struct Pose
 class Solver
 {
 public:
-  Solver(rclcpp::Node::SharedPtr node); 
+  Solver(std::weak_ptr<rclcpp::Node> node); 
 
   fire_control_interfaces::msg::GimbalCmd Solve(const auto_aim_interfaces::msg::Target &target_msg,
                                       const rclcpp::Time &current_time,
@@ -85,7 +85,9 @@ private:
   double cur_pitch_;
   double Cur_V_;
 
-  rclcpp::Node::SharedPtr node_; 
+  std::weak_ptr<rclcpp::Node> node_; 
+  //用与链接node的shared_ptr
+  std::shared_ptr<rclcpp::Node> node_shared_;   
 };
 
 

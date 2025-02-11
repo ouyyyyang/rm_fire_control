@@ -66,4 +66,15 @@ endif()
 ## Install ##
 #############
 
+# test node
+install(PROGRAMS
+  test/test_fire_control.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+#  launch 
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
 ament_auto_package()

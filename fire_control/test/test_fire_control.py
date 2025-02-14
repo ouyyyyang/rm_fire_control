@@ -15,7 +15,7 @@ class TestNode(Node):
         static_transform = TransformStamped()
         static_transform.header.stamp = self.get_clock().now().to_msg()
         static_transform.header.frame_id = 'odom'
-        static_transform.child_frame_id = 'target_frame'
+        static_transform.child_frame_id = 'gimbal_link'
         static_transform.transform.translation.x = 0.0
         static_transform.transform.rotation.w = 1.0
         self.tf_broadcaster.sendTransform(static_transform)
@@ -26,7 +26,7 @@ class TestNode(Node):
     def publish_target(self):
         msg = Target()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'target_frame'
+        msg.header.frame_id = 'odom'
         msg.tracking = True
         msg.id = "2";  
         msg.armors_num = 1; 

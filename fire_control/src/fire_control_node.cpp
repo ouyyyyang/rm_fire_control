@@ -15,9 +15,8 @@ namespace rm_fire_control
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
 :Node("fire_control",options), solver_(nullptr)
 {
-  RCLCPP_WARN(this->get_logger(), "FireControlNode: Warn level log");  
-  RCLCPP_ERROR(this->get_logger(), "FireControlNode: Error level log");
   RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
+
   // tf2 relevant
   tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   // Create the timer interface before call to waitForTransform,
@@ -71,6 +70,11 @@ void FireControlNode::TimerCallback()
 {  
   //  init
   fire_control_interfaces::msg::GimbalCmd control_msg; 
+
+  control_msg.tracking = latest_target_msg_->tracking;
+  control_msg.id = latest_target_msg_->id;
+  control_msg.armors_num = latest_target_msg_->armors_num;
+
   control_msg.yaw_diff = 0.0;
   control_msg.pitch_diff = 0.0;
   control_msg.distance = -1.0;
@@ -137,3 +141,7 @@ void FireControlNode::TimerCallback()
 }
 
 }    //namespace rm_fire_control
+
+#include "rclcpp_components/register_node_macro.hpp"
+
+RCLCPP_COMPONENTS_REGISTER_NODE(rm_fire_control::FireControlNode)

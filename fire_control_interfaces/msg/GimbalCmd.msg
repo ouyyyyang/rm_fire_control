@@ -1,4 +1,7 @@
 std_msgs/Header header
+bool tracking
+string id
+int32 armors_num
 float64 pitch
 float64 yaw
 float64 yaw_diff

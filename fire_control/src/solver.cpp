@@ -328,9 +328,9 @@ double Solver::PitchTrajectoryCompensation(const double &s, const double &z, con
     z_actual = MonoDirectionalAirResistanceModel(s, v, angle_pitch);
     dz = 0.3*(z - z_actual);
     z_temp = z_temp + dz;
-    RCLCPP_INFO(node_shared_->get_logger(),   
-                "iteration num %d: angle_pitch %f, temp target z:%f, err of z:%f, s:%f",   
-                i + 1, angle_pitch * 180 / M_PI, z_temp, dz, s);  
+    // RCLCPP_INFO(node_shared_->get_logger(),   
+    //             "iteration num %d: angle_pitch %f, temp target z:%f, err of z:%f, s:%f",   
+    //             i + 1, angle_pitch * 180 / M_PI, z_temp, dz, s);  
 
     if (std::fabs(dz) < 0.00001)
     {
@@ -347,8 +347,7 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
   t = (double)((std::exp(K_ * s) - 1) / (K_ * v * std::cos(angle)));
   //z为给定v与angle时的高度
   z = (double)(v * std::sin(angle) * t - Gravity_ * t * t / 2);
-  printf("model %f %f\n", t, z);
-  RCLCPP_INFO(node_shared_->get_logger(), "model %f %f\n", t, z);
+  // RCLCPP_INFO(node_shared_->get_logger(), "model %f %f\n", t, z);
   return z;
 }
 

@@ -30,7 +30,7 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   K_ = node->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）
   Gravity_ = node->declare_parameter<double>("gravity", 9.79);
 
-  YawMotorResSpeedA_ = node->declare_parameter<double>("yaw_motor_res_speed_a", 1.6);  // 电机响应速度  ax + b
+  YawMotorResSpeedA_ = node->declare_parameter<double>("yaw_motor_res_speed_a", 1.79e-3);  // 电机响应速度  ax + b
   YawMotorResSpeedB_ = node->declare_parameter<double>("yaw_motor_res_speed_b", 0.089);
   Transfer_Thresh_ = node->declare_parameter<int>("tranfer_thresh", 5);  //  跟踪状态转换阈值
   MaxTrackingVYaw_ = node->declare_parameter<double>("max_tracking_v_yaw", 6.0);   //最大甲板跟踪角速度（超过这个速度云台跟踪target）

@@ -114,7 +114,7 @@ void FireControlNode::TimerCallback()
 
   if (latest_target_msg_->tracking) {  
     try {  
-      control_msg = solver_->Solve(*latest_target_msg_, this->now(), tf2_buffer_);  
+      control_msg = solver_->Solve(*latest_target_msg_, tf2_buffer_);  
     } catch (const std::runtime_error &e) {  
       RCLCPP_ERROR(this->get_logger(), "Runtime error in solver: %s", e.what());  
       control_msg.yaw_diff = 0.0;

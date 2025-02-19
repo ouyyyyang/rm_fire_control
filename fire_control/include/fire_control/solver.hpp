@@ -32,6 +32,15 @@ struct Pose
 {
   Eigen::Vector3d position;
   double yaw;
+  double r;
+  double dz;
+};
+
+struct HitInfo
+{
+  double distance;
+  double yaw;
+  double pitch;
 };
 
 class Solver
@@ -40,50 +49,80 @@ public:
   Solver(std::weak_ptr<rclcpp::Node> node); 
 
   fire_control_interfaces::msg::GimbalCmd Solve(const auto_aim_interfaces::msg::Target &target_msg,
-                                      const rclcpp::Time &current_time,
                                       std::shared_ptr<tf2_ros::Buffer> tf2_buffer);
 
   enum State { TRACKING_ARMOR = 0, TRACKING_CENTER = 1 } state_;
 private:
-  double GetFlyingTime(const Eigen::Vector3d &p)const noexcept;
+  double GetFlyingTime(const Eigen::Vector3d &p);
 
   std::vector<Pose> GetArmorPoses(const Eigen::Vector3d &target_center,
                                   const double target_yaw,
                                   const double r1,
                                   const double r2,
                                   const double dz,
-                                  const size_t armors_num) const noexcept;
+                                  const size_t armors_num);
 
-  int SelectBestArmor(const std::vector<Pose> &armor_poses,
-                      const Eigen::Vector3d &target_center,
-                      const double target_yaw,
-                      const double v_yaw,
-                      const int armors_num) const noexcept;
-
-  bool FireCtrl(const double cur_yaw, const double cur_pitch, const Pose &est, const char &id_num);
 
   void CalcYawAndPitch(const Eigen::Vector3d &position, double &yaw, double &pitch);
 
-  double PitchTrajectoryCompensation(const double &s, const double &z, const double &v)const noexcept;
+  double PitchTrajectoryCompensation(const double &s, const double &z, const double &v);
 
-  double MonoDirectionalAirResistanceModel(const double &s, const double &v, const double &angle)const noexcept;
+  double MonoDirectionalAirResistanceModel(const double &s, const double &v, const double &angle);
+  
+  void GetBestPose(const auto_aim_interfaces::msg::Target &target,
+                          const double &dt,
+                          const double &max_orientation_angle,
+                          Pose &chosen_pose,
+                          HitInfo &hit_info);
 
+  bool FireCtrl(const auto_aim_interfaces::msg::Target &target,
+                      const double &dt,
+                      const double &max_orientation_angle,
+                      const double &cur_yaw,
+                      const double &cur_pitch,
+                      const HitInfo &hit_aim_info,
+                      const Pose &chosen_aim_pose);
+
+  bool AimErrorExceeded(const HitInfo &hit_info, const double &cur_yaw, const double &cur_pitch, const double &error_rate);
+
+  double ErrorDiff(const double &distance, const double &aim_angle, const double &cur_angle);
+  
+  Pose PredictArmorPose(const Pose& current_armor_pose,
+                      const Eigen::Vector3d& target_center_current,
+                      double target_yaw_current,
+                      const Eigen::Vector3d& velocity,
+                      double v_yaw,
+                      double time);
+  
   double LargeArmorWidth_;
   double SmallArmorWidth_;
   double LargeArmorHeight_;
   double SmallArmorHeight_;
-  double K_;
-  double Gravity_; 
-  double YawMotorResSpeed_;
+  double ArmorPitch_;
   double SBias_;
   double ZBias_;
-  int Transfer_Thresh_;
-  int overflow_count_;
+  double K_;
+  double Gravity_; 
   
-  double max_tracking_v_yaw_;
+  double YawMotorResSpeedA_;
+  double YawMotorResSpeedB_;
+  double Transfer_Thresh_;
+  double MaxTrackingVYaw_;
+  double MaxOrientationAngle_;
+
+  double MaxTrackingError_;
+  double MaxOutError_;
+
+  
+  double CommuniDelay_;
+  double ReceiveToFireDelay_;
+
+  double Cur_V_;
+  int overflow_count_;
   double cur_yaw_;
   double cur_pitch_;
-  double Cur_V_;
+  double armor_w_;
+  double armor_h_;
 
   std::weak_ptr<rclcpp::Node> node_; 
   //用与链接node的shared_ptr

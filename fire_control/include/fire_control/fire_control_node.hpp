@@ -40,10 +40,7 @@ private:
 
   void TargetCallback(const auto_aim_interfaces::msg::Target::SharedPtr msg);
 
-  void TimerCallback();
-
   std::unique_ptr<Solver> solver_;
-  std::shared_ptr<auto_aim_interfaces::msg::Target> latest_target_msg_; 
   rclcpp::Publisher<fire_control_interfaces::msg::GimbalCmd>::SharedPtr gimbal_pub_;
   rclcpp::TimerBase::SharedPtr pub_timer_;
   std::shared_ptr<tf2_ros::Buffer> tf2_buffer_;

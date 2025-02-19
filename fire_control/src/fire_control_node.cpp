@@ -43,8 +43,8 @@ FireControlNode::FireControlNode(const rclcpp::NodeOptions & options)
 
   gimbal_pub_ = this->create_publisher<fire_control_interfaces::msg::GimbalCmd>(
     "fire_control/cmd_gimbal",rclcpp::SensorDataQoS());
-  pub_timer_ = this->create_wall_timer(
-    std::chrono::milliseconds(4), std::bind(&FireControlNode::TimerCallback, this));
+  // pub_timer_ = this->create_wall_timer(
+  //   std::chrono::milliseconds(4), std::bind(&FireControlNode::TimerCallback, this));
 
   //debug_mode_ = this->declare_parameter<bool>("debug_mode", false); //之后用于发布markers
   RCLCPP_INFO(this->get_logger(), "FireControlNode initialization completed!"); 
@@ -57,23 +57,19 @@ void FireControlNode::TargetCallback(const auto_aim_interfaces::msg::Target::Sha
     solver_ = std::make_unique<Solver>(weak_from_this());
   }
 
-  RCLCPP_INFO(this->get_logger(),   
-    "Target received - frame_id: %s, tracking: %d, stamp: %.3f",  
-    msg->header.frame_id.c_str(),  
-    msg->tracking,  
-    rclcpp::Time(msg->header.stamp).seconds());  
-  
-  latest_target_msg_ = msg; 
-}  
+  // RCLCPP_INFO(this->get_logger(),   
+  //   "Target received - frame_id: %s, tracking: %d, stamp: %.3f",  
+  //   msg->header.frame_id.c_str(),  
+  //   msg->tracking,  
+  //   rclcpp::Time(msg->header.stamp).seconds());  
 
-void FireControlNode::TimerCallback()  
-{  
-  //  init
+
+
   fire_control_interfaces::msg::GimbalCmd control_msg; 
 
-  control_msg.tracking = latest_target_msg_->tracking;
-  control_msg.id = latest_target_msg_->id;
-  control_msg.armors_num = latest_target_msg_->armors_num;
+  control_msg.tracking = msg->tracking;
+  control_msg.id = msg->id;
+  control_msg.armors_num = msg->armors_num;
 
   control_msg.yaw_diff = 0.0;
   control_msg.pitch_diff = 0.0;
@@ -87,24 +83,24 @@ void FireControlNode::TimerCallback()
     return;
   }
 
-  if (!latest_target_msg_) 
+  if (!msg) 
   { 
     gimbal_pub_->publish(control_msg);
     return;  
   }  
 
-  if(latest_target_msg_->header.frame_id.empty())
+  if(msg->header.frame_id.empty())
   {
     RCLCPP_WARN(this->get_logger(), "Empty target frame_id");
     gimbal_pub_->publish(control_msg); 
     return;
   }
 
-  const auto target_time = tf2_ros::fromMsg(latest_target_msg_->header.stamp);
+  const auto target_time = tf2_ros::fromMsg(msg->header.stamp);
 
   if (!tf2_buffer_->canTransform(  
         target_frame_,
-        latest_target_msg_->header.frame_id,  
+        msg->header.frame_id,  
         target_time)) 
   {  
         RCLCPP_WARN(this->get_logger(), "Required transform is not available");
@@ -112,9 +108,9 @@ void FireControlNode::TimerCallback()
         return;  
   }
 
-  if (latest_target_msg_->tracking) {  
+  if (msg->tracking) {  
     try {  
-      control_msg = solver_->Solve(*latest_target_msg_, tf2_buffer_);  
+      control_msg = solver_->Solve(*msg, tf2_buffer_);  
     } catch (const std::runtime_error &e) {  
       RCLCPP_ERROR(this->get_logger(), "Runtime error in solver: %s", e.what());  
       control_msg.yaw_diff = 0.0;
@@ -136,9 +132,8 @@ void FireControlNode::TimerCallback()
     }  
   }
 
-  gimbal_pub_->publish(control_msg);  
-   
-}
+  gimbal_pub_->publish(control_msg);
+}  
 
 }    //namespace rm_fire_control
 

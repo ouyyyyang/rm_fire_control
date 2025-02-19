@@ -15,6 +15,7 @@ namespace rm_fire_control
 FireControlNode::FireControlNode(const rclcpp::NodeOptions & options) 
 :Node("fire_control",options), solver_(nullptr)
 {
+  RCLCPP_INFO(this->get_logger(), "Starting FireControlNode!");
 
   // tf2 relevant
   tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());

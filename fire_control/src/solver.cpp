@@ -24,7 +24,7 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   SmallArmorWidth_ = node->declare_parameter<double>("small_armor_width", 0.135);
   LargeArmorHeight_ = node->declare_parameter<double>("large_armor_height", 0.127);
   SmallArmorHeight_ = node->declare_parameter<double>("small_armor_height", 0.125);
-  ArmorPitch_ = (node->declare_parameter<double>("armor_pitch", 15) / 180.0 * M_PI); //装甲板pitch角
+  ArmorPitch_ = (node->declare_parameter<double>("armor_pitch", 15.0) / 180.0 * M_PI); //装甲板pitch角
   SBias_ = node->declare_parameter<double>("s_bias", 0.0);  //枪管口
   ZBias_ = node->declare_parameter<double>("z_bias", 0.0);
   K_ = node->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）

@@ -4,7 +4,7 @@
     small_armor_width: 0.135
     large_armor_height: 0.127
     small_armor_height: 0.125
-    armor_pitch: 15
+    armor_pitch: 15.0
     s_bias: 0.21
     z_bias: 0.0
     k: 0.030  

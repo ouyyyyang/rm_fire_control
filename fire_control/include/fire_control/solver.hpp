@@ -85,6 +85,8 @@ private:
   double cur_pitch_;
   double Cur_V_;
 
+  double Delay_;
+
   std::weak_ptr<rclcpp::Node> node_; 
   //用与链接node的shared_ptr
   std::shared_ptr<rclcpp::Node> node_shared_;   

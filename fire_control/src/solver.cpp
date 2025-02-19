@@ -29,10 +29,11 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   Gravity_ = node->declare_parameter<double>("gravity", 9.79);
   YawMotorResSpeed_ = node->declare_parameter<double>("yaw_motor_res_speed", 1.6);  // 电机响应速度
   Transfer_Thresh_ = node->declare_parameter<int>("tranfer_thresh", 5);
-  SBias_ = node->declare_parameter<double>("s_bias", 0.0);  //记得转换为秒为单位
-  ZBias_ = node->declare_parameter<double>("z_bias", 0.0);
+  SBias_ = node->declare_parameter<double>("s_bias", 0.0); 
+  ZBias_ = node->declare_parameter<double>("z_bias", 0.0);   //gimbal to the barrel of the gun
   max_tracking_v_yaw_ = node->declare_parameter<double>("max_tracking_v_yaw", 6.0);  
   Cur_V_ = node->declare_parameter<double>("current_v", 22.0);  //  m/s
+  Delay_ = node->declare_parameter<double>("delay", 0.01);  //  s  Physical delay;  
 
   overflow_count_ = 0;
   state_ = State::TRACKING_ARMOR;
@@ -69,7 +70,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   double target_yaw = target.yaw;
   double flying_time = GetFlyingTime(target_position);
   double dt =
-      (current_time - rclcpp::Time(target.header.stamp)).seconds() + flying_time;  
+      (current_time - rclcpp::Time(target.header.stamp)).seconds() + flying_time + Delay_;  
   target_position.x() += dt * target.velocity.x;
   target_position.y() += dt * target.velocity.y;
   target_position.z() += dt * target.velocity.z;
@@ -274,16 +275,14 @@ int Solver::SelectBestArmor(const std::vector<Pose> &armor_poses,
 bool Solver::FireCtrl(const double cur_yaw, const double cur_pitch, const Pose &est, const char &id_num)
 {
 
-  double armor_w, armor_h;
+  double armor_w;
   if(id_num == '2')
   {
     armor_w = LargeArmorWidth_;
-    armor_h = LargeArmorHeight_;
   }
   else
   {
     armor_w = SmallArmorWidth_;
-    armor_h = SmallArmorHeight_;
   }
   // allow angle of yaw
   double ax = est.position.x() - 0.5f * armor_w * sin(est.yaw);
@@ -298,14 +297,7 @@ bool Solver::FireCtrl(const double cur_yaw, const double cur_pitch, const Pose &
 
   double control_yaw_angle = angle_c - cur_yaw;
 
-  //  allow angle of pitch
-  double distance = est.position.head(2).norm();
-  double az = est.position.z() - 0.5f * armor_h;
-  double bz = est.position.z() + 0.5f * armor_h;
-  double allow_fire_pitchang_min = atan2(az, distance);
-  double allow_fire_pitchang_max = atan2(bz, distance);
-  return (control_yaw_angle < allow_fire_yawang_max && control_yaw_angle > allow_fire_yawang_min)&&
-         (cur_pitch < allow_fire_pitchang_max && cur_pitch > allow_fire_pitchang_min);
+  return (control_yaw_angle < allow_fire_yawang_max && control_yaw_angle > allow_fire_yawang_min);
 }
 
 //calculate the suitable gimbal pose

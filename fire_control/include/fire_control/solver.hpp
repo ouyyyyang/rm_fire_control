@@ -51,7 +51,7 @@ public:
   fire_control_interfaces::msg::GimbalCmd Solve(const auto_aim_interfaces::msg::Target &target_msg,
                                       std::shared_ptr<tf2_ros::Buffer> tf2_buffer);
 
-  enum State { TRACKING_ARMOR = 0, TRACKING_CENTER = 1 } state_;
+  enum State { SLOW = 0, NORMAL = 1, FAST = 2 } state_;
 private:
   double GetFlyingTime(const Eigen::Vector3d &p);
 
@@ -107,7 +107,8 @@ private:
   double YawMotorResSpeedA_;
   double YawMotorResSpeedB_;
   double Transfer_Thresh_;
-  double MaxTrackingVYaw_;
+  double MaxTrackingVYaw1_;
+  double MaxTrackingVYaw2_;
   double MaxOrientationAngle_;
 
   double MaxTrackingError_;
@@ -118,7 +119,8 @@ private:
   double ReceiveToFireDelay_;
 
   double Cur_V_;
-  int overflow_count_;
+  int up_overflow_count_;
+  int down_overflow_count_;
   double cur_yaw_;
   double cur_pitch_;
   double armor_w_;

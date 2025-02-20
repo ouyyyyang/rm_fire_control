@@ -8,13 +8,14 @@
     s_bias: 0.21
     z_bias: 0.0
     k: 0.030  
-
     gravity: 9.79
+
     yaw_motor_res_speed_a: 1.79e-3
-    yaw_motor_res_speed_b: 1.6
+    yaw_motor_res_speed_b: 0.093
     tranfer_thresh: 5
-    max_tracking_v_yaw: 6.0
-    max_orentation_angle: 58.8
+    max_tracking_v_yaw_1: 1.1
+    max_tracking_v_yaw_2: 6.0
+    max_orientation_angle: 58.8
     max_tracking_error: 0.8
     max_out_error: 0.6
 

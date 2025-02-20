@@ -33,8 +33,9 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   YawMotorResSpeedA_ = node->declare_parameter<double>("yaw_motor_res_speed_a", 1.79e-3);  // 电机响应速度  ax + b
   YawMotorResSpeedB_ = node->declare_parameter<double>("yaw_motor_res_speed_b", 0.089);
   Transfer_Thresh_ = node->declare_parameter<int>("tranfer_thresh", 5);  //  跟踪状态转换阈值
-  MaxTrackingVYaw_ = node->declare_parameter<double>("max_tracking_v_yaw", 6.0);   //最大甲板跟踪角速度（超过这个速度云台跟踪target）
-  MaxOrientationAngle_ = (node->declare_parameter<double>("max_orentation_angle", 58.8) / 180.0 * M_PI);  //最大甲板跟踪角 角度转弧度
+  MaxTrackingVYaw1_ = node->declare_parameter<double>("max_tracking_v_yaw_1", 1.1);   //最大甲板跟踪角速度
+  MaxTrackingVYaw2_ = node->declare_parameter<double>("max_tracking_v_yaw_2", 6.0);
+  MaxOrientationAngle_ = (node->declare_parameter<double>("max_orientation_angle", 58.8) / 180.0 * M_PI);  //最大甲板跟踪角 角度转弧度
   MaxTrackingError_ = node->declare_parameter<double>("max_tracking_error", 0.8);  //1为可以打装甲板边缘
   MaxOutError_ = node->declare_parameter<double>("max_out_error", 0.6);  //装甲板位置出现的最大偏差
 
@@ -43,8 +44,9 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   ReceiveToFireDelay_ = node->declare_parameter<double>("receive_to_fire_delay", 0.01);  //接收信息到开火延迟
 
   Cur_V_ = node->declare_parameter<double>("current_v", 22.0);  //  m/s
-  overflow_count_ = 0;
-  state_ = State::TRACKING_ARMOR;
+  up_overflow_count_ = 0;
+  down_overflow_count_ = 0;
+  state_ = State::SLOW;
   
 
   node.reset();
@@ -74,9 +76,17 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   armor_w_ = (target.id == std::string("2")) ? LargeArmorWidth_ : SmallArmorWidth_;
   armor_h_ = (target.id == std::string("2")) ? LargeArmorHeight_ : SmallArmorHeight_;
 
-  if(std::abs(target.v_yaw) > MaxTrackingVYaw_)
+  if(std::abs(target.v_yaw) > MaxTrackingVYaw1_)
   {
-    state_ = TRACKING_CENTER;
+    state_ = NORMAL;
+    if(std::abs(target.v_yaw) > MaxTrackingVYaw2_)
+    {
+      state_ = FAST;
+    }
+  }
+  else
+  {
+    state_ = SLOW;
   }
 
   double max_orientation_angle;
@@ -84,42 +94,86 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   // State change 转速慢就算上云台转动，转速快就直接打
   switch (state_) 
   {
-    case TRACKING_ARMOR: 
+    case SLOW: 
     {
-      if (std::abs(target.v_yaw) > MaxTrackingVYaw_) 
+      if (std::abs(target.v_yaw) > MaxTrackingVYaw1_) 
       {
-          overflow_count_++;
+        up_overflow_count_++;
       } else 
       {
-          overflow_count_ = 0;
+        up_overflow_count_ = 0;
       }
-
-      if (overflow_count_ > Transfer_Thresh_) 
+      //state renew
+      if (up_overflow_count_ > Transfer_Thresh_) 
       {
-        state_ = TRACKING_CENTER;
+        state_ = NORMAL;
+        up_overflow_count_ = 0;
+        down_overflow_count_ = 0;
+        max_orientation_angle = 0.0;
       }
-
-      max_orientation_angle = MaxOrientationAngle_;
-
+      else
+      {
+        max_orientation_angle = MaxOrientationAngle_;
+      }      
       break;
     }
-    case TRACKING_CENTER: 
+    case NORMAL: 
     {
-      if (std::abs(target.v_yaw) < MaxTrackingVYaw_) 
+      if (std::abs(target.v_yaw) > MaxTrackingVYaw2_) 
       {
-        overflow_count_++;
+        up_overflow_count_++;
       } else 
       {
-        overflow_count_ = 0;
+        up_overflow_count_ = 0;
       }
-
-      if (overflow_count_ > Transfer_Thresh_) 
+      if (std::abs(target.v_yaw) < MaxTrackingVYaw1_) 
       {
-        state_ = TRACKING_ARMOR;
-        overflow_count_ = 0;
+        down_overflow_count_++;
+      } else 
+      {
+        down_overflow_count_ = 0;
       }
-      max_orientation_angle = 0.0;
-
+      //state renew
+      if (up_overflow_count_ > Transfer_Thresh_) 
+      {
+        state_ = FAST;
+        up_overflow_count_ = 0;
+        max_orientation_angle = 0.0;
+      }
+      else if (down_overflow_count_ > Transfer_Thresh_) 
+      {
+        state_ = SLOW;
+        up_overflow_count_ = 0;
+        down_overflow_count_ = 0;
+        max_orientation_angle = MaxOrientationAngle_;
+      }
+      else
+      {
+        max_orientation_angle = 0.0;
+      }
+      break;
+    }
+    case FAST:
+    {
+      if(std::abs(target.v_yaw) < MaxTrackingVYaw2_)
+      {
+        down_overflow_count_++;
+      }else
+      {
+        down_overflow_count_ = 0;
+      }
+      //state renew
+      if (down_overflow_count_ > Transfer_Thresh_) 
+      {
+        state_ = NORMAL;
+        up_overflow_count_ = 0;
+        down_overflow_count_ = 0;
+        max_orientation_angle = 0.0;
+      }
+      else
+      {
+        max_orientation_angle = 0.0;
+      }
       break;
     }
   }
@@ -135,12 +189,16 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   double flying_time = GetFlyingTime(target_position);
   double dt = (node_shared_->get_clock()->now() - rclcpp::Time(target.header.stamp)).seconds() + CommuniDelay_ + flying_time;
 
-
   GetBestPose(target, dt, max_orientation_angle, chosen_aim_pose, hit_aim_info);
   
+  if (hit_aim_info.distance == -1.0) 
+  {  
+    RCLCPP_ERROR(node_shared_->get_logger(), "Invalid distance detected.");
+  } 
   //弧度制
   gimbal_cmd.yaw = hit_aim_info.yaw;
   gimbal_cmd.pitch = hit_aim_info.pitch; 
+  gimbal_cmd.distance = gimbal_cmd.distance;
   //  change of angle
   gimbal_cmd.yaw_diff = hit_aim_info.yaw - cur_yaw_;
   gimbal_cmd.pitch_diff = - (hit_aim_info.pitch - cur_pitch_);
@@ -239,7 +297,6 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
   return z;
 }
 
-
 void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
                           const double &dt,
                           const double &max_orientation_angle,
@@ -276,53 +333,62 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
         min_angle_to_x = std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x());
       }
     }
-    //角速度较小特例
-    else if(std::abs(target.v_yaw) < 0.1)
-    {
-      if(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()) < min_angle_to_x)
-      {
-        best_armor_index = i;
-        min_angle_to_x = std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x());
-      }
-    }
+    // //角速度较小特例
+    // else if(std::abs(target.v_yaw) < 0.1)
+    // {
+    //   if(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()) < min_angle_to_x)
+    //   {
+    //     best_armor_index = i;
+    //     min_angle_to_x = std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x());
+    //   }
+    // }
   }
 
   if(best_armor_index == -1)
   {
-    double min_armor_to_wait = 1000.0;
-    int indirect_aim_armor_num;
-
-    for(int i = 0; i < target.armors_num; i++)
+    // 
+    if(state_ != SLOW)
     {
-      double max_out_angle = armor_w_ / 2.0 * MaxOutError_ / armor_poses[i].r;
-      double theta = std::atan2(std::sin(armor_poses[i].yaw + M_PI), std::cos(armor_poses[i].yaw + M_PI));
-      //装甲板到等待角
-      double angle = target.v_yaw > 0.0 ? -max_orientation_angle - theta : theta - max_orientation_angle;
-      double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI -max_out_angle;
+      double min_armor_to_wait = 1000.0;
+      int indirect_aim_armor_num = 0;
 
-      //选择最小角
-      if(armor_to_wait  < min_armor_to_wait)
+      for(int i = 0; i < target.armors_num; i++)
       {
-        min_armor_to_wait = armor_to_wait;
-        indirect_aim_armor_num = i;
-      }
-    }
+        double max_out_angle = armor_w_ / 2.0 * MaxOutError_ / armor_poses[i].r;
+        double theta = std::atan2(std::sin(armor_poses[i].yaw + M_PI), std::cos(armor_poses[i].yaw + M_PI));
+        //装甲板到等待角
+        double angle = target.v_yaw > 0.0 ? -max_orientation_angle - theta : theta - max_orientation_angle;
+        double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI -max_out_angle;
 
-    chosen_pose = armor_poses[indirect_aim_armor_num];
-    //到等待角时间
-    double time_to_wait_angle = min_armor_to_wait / std::abs(target.v_yaw);
-    //预测位置
-    target_position += time_to_wait_angle * target_velocity;
-    target_yaw += time_to_wait_angle * target.v_yaw;
-    
-    hit_info.distance = target_position.norm();
-    if (hit_info.distance < 0.1) {
-      throw std::runtime_error("No valid armor to shoot");
+        //选择最小角
+        if(armor_to_wait  < min_armor_to_wait)
+        {
+          min_armor_to_wait = armor_to_wait;
+          indirect_aim_armor_num = i;
+        }
+      }
+
+      chosen_pose = armor_poses[indirect_aim_armor_num];
+      //到等待角时间
+      double time_to_wait_angle = min_armor_to_wait / std::abs(target.v_yaw);
+      //预测位置
+      target_position += time_to_wait_angle * target_velocity;
+      target_yaw += time_to_wait_angle * target.v_yaw;
+      
+      hit_info.distance = target_position.norm();
+      if (hit_info.distance < 0.1) {
+        throw std::runtime_error("No valid armor to shoot");
+      }
+      std::vector<Pose> predict_armor_poses = GetArmorPoses(
+        target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
+      //瞄准
+      CalcYawAndPitch(predict_armor_poses[indirect_aim_armor_num].position, hit_info.yaw, hit_info.pitch);
     }
-    std::vector<Pose> predict_armor_poses = GetArmorPoses(
-      target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
-    //瞄准
-    CalcYawAndPitch(predict_armor_poses[indirect_aim_armor_num].position, hit_info.yaw, hit_info.pitch);
+    else
+    {
+      hit_info.distance = -1.0;
+      return;
+    }
   }
   else
   {
@@ -355,16 +421,17 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
   
   Pose chosen_actual_pose;
   HitInfo hit_actual_info;
-
+ 
   GetBestPose(target, dt, max_orientation_angle, chosen_actual_pose, hit_actual_info);
   
   //判断装甲板处于可击打范围内(之后改进方向，订阅detector，同步电控云台传输，可以改进装配误差)
   if(AimErrorExceeded(hit_aim_info, cur_yaw, cur_pitch, MaxOutError_))
   {
+    RCLCPP_INFO(node_shared_->get_logger(), "not true positon");
     return false;
   }
 
-  if(1)   //这里改逻辑，低速不触发
+  if(state_ != SLOW)   //这里改逻辑，低速不触发
   {
     //云台指向打击状态与真实打击状态
     double yaw_aim_to_actual = chosen_actual_pose.yaw - chosen_aim_pose.yaw;
@@ -395,6 +462,7 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
       if(time_start_rotating_back < time_actual_hit 
           && time_actual_hit < time_end_rotating_back)
       {
+        RCLCPP_INFO(node_shared_->get_logger(), "stay rotating");
         return false;
       }   
     }
@@ -414,13 +482,13 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
 bool Solver::AimErrorExceeded(const HitInfo &hit_info, const double &cur_yaw, const double &cur_pitch, const double &error_rate)
 {
   if(ErrorDiff(hit_info.distance, hit_info.yaw, cur_yaw)  > armor_w_ / 2.0 * 
-   std::cos(std::atan2(std::sin(hit_info.yaw + M_PI), std::cos(hit_info.yaw + M_PI))) *
+   std::cos(std::atan2(std::sin(hit_info.yaw - cur_yaw), std::cos(hit_info.yaw - cur_yaw))) *
    error_rate)
   {
     return true;
   }
 
-  if(ErrorDiff(hit_info.distance, hit_info.pitch, cur_pitch) > armor_h_ / 2.0 * std::cos(ArmorPitch_ + cur_pitch) * error_rate)
+  if(ErrorDiff(hit_info.distance, hit_info.pitch, cur_pitch) > armor_h_ / 2.0 * std::cos(ArmorPitch_ + ZBias_) * error_rate)
   {
     return true;
   }
@@ -431,7 +499,7 @@ bool Solver::AimErrorExceeded(const HitInfo &hit_info, const double &cur_yaw, co
 //误差距
 double Solver::ErrorDiff(const double &distance, const double &aim_angle, const double &cur_angle)
 {
-  if (distance < 0.001) {  // 添加距离过小的保护
+  if (distance < 0.01) {  // 添加距离过小的保护
     return 1000.0;
   }
 

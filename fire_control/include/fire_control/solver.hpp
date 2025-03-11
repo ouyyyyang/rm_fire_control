@@ -41,6 +41,9 @@ struct HitInfo
   double distance;
   double yaw;
   double pitch;
+  double distance_v;
+  double yaw_v;
+  double pitch_v;
 };
 
 class Solver
@@ -68,6 +71,8 @@ private:
   double PitchTrajectoryCompensation(const double &s, const double &z, const double &v);
 
   double MonoDirectionalAirResistanceModel(const double &s, const double &v, const double &angle);
+
+  double AngleToGimbalX(const double &yaw, const double &cur_yaw);
   
   void GetBestPose(const auto_aim_interfaces::msg::Target &target,
                           const double &dt,
@@ -92,7 +97,8 @@ private:
                       double target_yaw_current,
                       const Eigen::Vector3d& velocity,
                       double v_yaw,
-                      double time);
+                      double time,
+                      int armors_num);
   
   double LargeArmorWidth_;
   double SmallArmorWidth_;

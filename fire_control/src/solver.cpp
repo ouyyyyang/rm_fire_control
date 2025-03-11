@@ -73,8 +73,10 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     throw ex;
   }
 
-  armor_w_ = (target.id == std::string("2")) ? LargeArmorWidth_ : SmallArmorWidth_;
-  armor_h_ = (target.id == std::string("2")) ? LargeArmorHeight_ : SmallArmorHeight_;
+
+
+  armor_w_ = (target.id == std::string("1")) ? LargeArmorWidth_ : SmallArmorWidth_;
+  armor_h_ = (target.id == std::string("1")) ? LargeArmorHeight_ : SmallArmorHeight_;
 
   if(std::abs(target.v_yaw) > MaxTrackingVYaw1_)
   {
@@ -194,11 +196,22 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   if (hit_aim_info.distance == -1.0) 
   {  
     RCLCPP_ERROR(node_shared_->get_logger(), "Invalid distance detected.");
+    gimbal_cmd.yaw = 0.0;
+    gimbal_cmd.pitch = 0.0; 
+    gimbal_cmd.distance = 0.0;
+
+    gimbal_cmd.aim_x = 0.0;
+    gimbal_cmd.aim_y = 0.0;
+    gimbal_cmd.aim_z = 0.0;
   } 
   //弧度制
   gimbal_cmd.yaw = hit_aim_info.yaw;
   gimbal_cmd.pitch = hit_aim_info.pitch; 
-  gimbal_cmd.distance = gimbal_cmd.distance;
+  gimbal_cmd.distance = hit_aim_info.distance;
+
+  gimbal_cmd.aim_x = chosen_aim_pose.position.x();
+  gimbal_cmd.aim_y = chosen_aim_pose.position.y();
+  gimbal_cmd.aim_z = chosen_aim_pose.position.z();
   //  change of angle
   gimbal_cmd.yaw_diff = hit_aim_info.yaw - cur_yaw_;
   gimbal_cmd.pitch_diff = - (hit_aim_info.pitch - cur_pitch_);
@@ -208,7 +221,7 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   gimbal_cmd.fire_advice = FireCtrl(target, dt, max_orientation_angle, cur_yaw_, cur_pitch_, hit_aim_info, chosen_aim_pose);
   
   if (gimbal_cmd.fire_advice) {
-    RCLCPP_INFO(node_shared_->get_logger(), "You Need Fire!");
+    //RCLCPP_INFO(node_shared_->get_logger(), "You Need Fire!");
   }
 
   node_shared_.reset();
@@ -297,6 +310,11 @@ double Solver::MonoDirectionalAirResistanceModel(const double &s, const double &
   return z;
 }
 
+double Solver::AngleToGimbalX(const double &yaw, const double &cur_yaw)
+{
+  return std::atan2(std::sin(yaw - cur_yaw), std::cos(yaw - cur_yaw));
+}
+
 void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
                           const double &dt,
                           const double &max_orientation_angle,
@@ -316,21 +334,20 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
       target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
 
   //select aim
-  armor_w_ = (target.id == std::string("2")) ? LargeArmorWidth_ : SmallArmorWidth_;
   int best_armor_index = -1;
   
   double min_angle_to_x = 1000.0;
   for(int i = 0; i < target.armors_num; i++)
   {
     // Angle between armor and the X-axis
-    double theta = std::atan2(std::sin(armor_poses[i].yaw + M_PI), std::cos(armor_poses[i].yaw + M_PI));
+    double theta = AngleToGimbalX(armor_poses[i].yaw, std::atan2(target_position.y(), target_position.x()));
 
     if(std::abs(theta) <= max_orientation_angle)
     {
-      if(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()) < min_angle_to_x)
+      if(std::abs(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()))< min_angle_to_x)
       {
         best_armor_index = i;
-        min_angle_to_x = std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x());
+        min_angle_to_x = std::abs(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()));
       }
     }
     // //角速度较小特例
@@ -343,10 +360,13 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
     //   }
     // }
   }
+  
+  
+
 
   if(best_armor_index == -1)
   {
-    // 
+    // RCLCPP_INFO(node_shared_->get_logger(), "no drict armor");
     if(state_ != SLOW)
     {
       double min_armor_to_wait = 1000.0;
@@ -355,10 +375,10 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
       for(int i = 0; i < target.armors_num; i++)
       {
         double max_out_angle = armor_w_ / 2.0 * MaxOutError_ / armor_poses[i].r;
-        double theta = std::atan2(std::sin(armor_poses[i].yaw + M_PI), std::cos(armor_poses[i].yaw + M_PI));
+        double theta = AngleToGimbalX(armor_poses[i].yaw, cur_yaw_);
         //装甲板到等待角
-        double angle = target.v_yaw > 0.0 ? -max_orientation_angle - theta : theta - max_orientation_angle;
-        double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI -max_out_angle;
+        double angle = (target.v_yaw > 0.0 ? -max_orientation_angle - theta : theta - max_orientation_angle) - M_PI + max_out_angle;
+        double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI - max_out_angle;
 
         //选择最小角
         if(armor_to_wait  < min_armor_to_wait)
@@ -383,6 +403,7 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
         target_position, target_yaw, target.radius_1, target.radius_2, target.dz, target.armors_num);
       //瞄准
       CalcYawAndPitch(predict_armor_poses[indirect_aim_armor_num].position, hit_info.yaw, hit_info.pitch);
+      //
     }
     else
     {
@@ -425,9 +446,10 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
   GetBestPose(target, dt, max_orientation_angle, chosen_actual_pose, hit_actual_info);
   
   //判断装甲板处于可击打范围内(之后改进方向，订阅detector，同步电控云台传输，可以改进装配误差)
-  if(AimErrorExceeded(hit_aim_info, cur_yaw, cur_pitch, MaxOutError_))
+  // RCLCPP_INFO(node_shared_->get_logger(), "kkkk%f", MaxTrackingError_);
+  if(AimErrorExceeded(hit_aim_info, cur_yaw, cur_pitch, MaxTrackingError_))
   {
-    RCLCPP_INFO(node_shared_->get_logger(), "not true positon");
+    //RCLCPP_INFO(node_shared_->get_logger(), "not true positon");
     return false;
   }
 
@@ -440,7 +462,7 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
     if(std::signbit(target.v_yaw) != std::signbit(yaw_aim_to_actual))
     {
       //计算装甲板回转角度
-      double aim_theta = std::atan2(std::sin(chosen_aim_pose.yaw + M_PI), std::cos(chosen_aim_pose.yaw + M_PI));
+      double aim_theta = std::atan2(std::sin(chosen_aim_pose.yaw), std::cos(chosen_aim_pose.yaw));
       double armor_angle = target.v_yaw > 0.0 ? max_orientation_angle - aim_theta : -max_orientation_angle - aim_theta;
       double aim_hit_to_rotate_back = std::atan2(std::sin(armor_angle), std::cos(armor_angle));
       //各个时间
@@ -449,7 +471,7 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
       double time_start_rotating_back = time_aim_hit + aim_hit_to_rotate_back / target.v_yaw;
       //回转时间后装甲板位置
       auto pos_when_start_rotating_back = PredictArmorPose(chosen_aim_pose, target_position - ReceiveToFireDelay_ * target_velocity, 
-        target.yaw - ReceiveToFireDelay_ * target.v_yaw, target_velocity, target.v_yaw, aim_hit_to_rotate_back / target.v_yaw);
+        target.yaw - ReceiveToFireDelay_ * target.v_yaw, target_velocity, target.v_yaw, aim_hit_to_rotate_back / target.v_yaw + ReceiveToFireDelay_, target.armors_num);
       HitInfo hit_when_start_rotating_back;
       CalcYawAndPitch(pos_when_start_rotating_back.position, hit_when_start_rotating_back.yaw, hit_when_start_rotating_back.pitch);
       //枪口回转角度
@@ -462,7 +484,7 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
       if(time_start_rotating_back < time_actual_hit 
           && time_actual_hit < time_end_rotating_back)
       {
-        RCLCPP_INFO(node_shared_->get_logger(), "stay rotating");
+        //RCLCPP_INFO(node_shared_->get_logger(), "stay rotating");
         return false;
       }   
     }
@@ -470,7 +492,7 @@ bool Solver::FireCtrl(const auto_aim_interfaces::msg::Target &target,
 
   double actual_yaw, actual_pitch;
   CalcYawAndPitch(chosen_actual_pose.position, actual_yaw, actual_pitch);
-  if(AimErrorExceeded(hit_actual_info, actual_yaw, actual_pitch, MaxOutError_))
+  if(AimErrorExceeded(hit_actual_info, actual_yaw, actual_pitch, MaxTrackingError_))
   {
     return false;
   }
@@ -513,8 +535,18 @@ Pose Solver::PredictArmorPose(const Pose& current_armor_pose,
                       double target_yaw_current,
                       const Eigen::Vector3d& velocity,
                       double v_yaw,
-                      double time)
+                      double time,
+                      int armors_num)
 {
+  int index = (int)(std::round((current_armor_pose.yaw - target_yaw_current) / (2 * M_PI / armors_num)));
+  if(index >= armors_num)
+  {
+    index = 0;
+  }
+  else if(index < 0)
+  {
+    index = armors_num - 1;
+  }
   Pose predict_pose;
   predict_pose.r = current_armor_pose.r;
   predict_pose.dz = current_armor_pose.dz;
@@ -523,12 +555,8 @@ Pose Solver::PredictArmorPose(const Pose& current_armor_pose,
   // 计算新目标yaw角
   double new_target_yaw = target_yaw_current + v_yaw * time;
     
-  // 计算相对角度（调整到[-π, π]范围内）
-  double theta_rel = current_armor_pose.yaw - target_yaw_current;
-  theta_rel = std::fmod(theta_rel + M_PI, 2 * M_PI) - M_PI;
-    
   // 计算新装甲板yaw
-  predict_pose.yaw = new_target_yaw + theta_rel;
+  predict_pose.yaw = new_target_yaw + index * (2 * M_PI / armors_num);
     
   // 计算新位置
   predict_pose.position = new_center + 

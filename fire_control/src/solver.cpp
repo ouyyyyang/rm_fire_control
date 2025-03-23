@@ -25,7 +25,7 @@ Solver::Solver(std::weak_ptr<rclcpp::Node> n)
   LargeArmorHeight_ = node->declare_parameter<double>("large_armor_height", 0.127);
   SmallArmorHeight_ = node->declare_parameter<double>("small_armor_height", 0.125);
   ArmorPitch_ = (node->declare_parameter<double>("armor_pitch", 15.0) / 180.0 * M_PI); //装甲板pitch角
-  SBias_ = node->declare_parameter<double>("s_bias", 0.0);  //枪管口
+  SBias_ = node->declare_parameter<double>("s_bias", 0.0);  //odom到摩擦轮
   ZBias_ = node->declare_parameter<double>("z_bias", 0.0);
   K_ = node->declare_parameter<double>("k",0.025);  //弹丸参数（分小弹丸和大弹丸）
   Gravity_ = node->declare_parameter<double>("gravity", 9.79);
@@ -72,7 +72,6 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
     RCLCPP_ERROR(node_shared_->get_logger(), "armor_solver: %s", ex.what());
     throw ex;
   }
-
 
 
   armor_w_ = (target.id == std::string("1")) ? LargeArmorWidth_ : SmallArmorWidth_;
@@ -183,6 +182,10 @@ fire_control_interfaces::msg::GimbalCmd Solver::Solve(const auto_aim_interfaces:
   // Init
   fire_control_interfaces::msg::GimbalCmd gimbal_cmd;
   gimbal_cmd.header = target.header;
+  gimbal_cmd.tracking = target.tracking;
+  gimbal_cmd.id = target.id;
+  gimbal_cmd.armors_num = target.armors_num;
+
   Pose chosen_aim_pose;
   //即云台跟随的信息
   HitInfo hit_aim_info;
@@ -344,26 +347,15 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
 
     if(std::abs(theta) <= max_orientation_angle)
     {
-      if(std::abs(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()))< min_angle_to_x)
+      if(std::abs(AngleToGimbalX(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()), cur_yaw_)) < min_angle_to_x)
       {
         best_armor_index = i;
-        min_angle_to_x = std::abs(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()));
+        min_angle_to_x = std::abs(AngleToGimbalX(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()), cur_yaw_));
       }
     }
-    // //角速度较小特例
-    // else if(std::abs(target.v_yaw) < 0.1)
-    // {
-    //   if(std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x()) < min_angle_to_x)
-    //   {
-    //     best_armor_index = i;
-    //     min_angle_to_x = std::atan2(armor_poses[i].position.y(), armor_poses[i].position.x());
-    //   }
-    // }
+
   }
   
-  
-
-
   if(best_armor_index == -1)
   {
     // RCLCPP_INFO(node_shared_->get_logger(), "no drict armor");
@@ -510,10 +502,10 @@ bool Solver::AimErrorExceeded(const HitInfo &hit_info, const double &cur_yaw, co
     return true;
   }
 
-  if(ErrorDiff(hit_info.distance, hit_info.pitch, cur_pitch) > armor_h_ / 2.0 * std::cos(ArmorPitch_ + ZBias_) * error_rate)
-  {
-    return true;
-  }
+  // if(ErrorDiff(hit_info.distance, hit_info.pitch, cur_pitch) > armor_h_ / 2.0 * std::cos(ArmorPitch_ + ZBias_) * error_rate)
+  // {
+  //   return true;
+  // }
 
   return false;
 }

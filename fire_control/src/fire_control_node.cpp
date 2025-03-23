@@ -77,7 +77,7 @@ void FireControlNode::ControlTimerCallback()
 
   fire_control_interfaces::msg::GimbalCmd control_msg;
   control_msg.tracking = false;
-  control_msg.id = ' ';
+  control_msg.id = "";
   control_msg.armors_num = 0;
   control_msg.yaw_diff = 0.0;
   control_msg.pitch_diff = 0.0;
@@ -99,10 +99,6 @@ void FireControlNode::ControlTimerCallback()
     gimbal_pub_->publish(control_msg);
     return;
   }
-
-  control_msg.tracking = current_target->tracking;
-  control_msg.id = current_target->id;
-  control_msg.armors_num = current_target->armors_num;
 
   if(current_target->header.frame_id.empty())
   {

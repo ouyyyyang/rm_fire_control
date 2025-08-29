@@ -370,7 +370,7 @@ void Solver::GetBestPose(const auto_aim_interfaces::msg::Target &target,
         double theta = AngleToGimbalX(armor_poses[i].yaw, cur_yaw_);
         //装甲板到等待角
         double angle = (target.v_yaw > 0.0 ? -max_orientation_angle - theta : theta - max_orientation_angle) - M_PI + max_out_angle;
-        double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI - max_out_angle;
+        double armor_to_wait = std::atan2(std::sin(angle), std::cos(angle)) + M_PI;
 
         //选择最小角
         if(armor_to_wait  < min_armor_to_wait)
